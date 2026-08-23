@@ -3,7 +3,7 @@ import io
 import warnings
 import pandas as pd
 import openpyxl
-from openpyxl.styles import PatternFill, Font, Alignment
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 import streamlit as st
 
 # Ocultar advertencias no críticas
@@ -11,67 +11,108 @@ warnings.filterwarnings('ignore', category=UserWarning)
 
 # Configuración de página en Streamlit
 st.set_page_config(
-    page_title="Auditor TS - GeoVictoria", 
-    page_icon="📊", 
-    layout="wide"
+    page_title="Auditor TS - Casalimpia", 
+    page_icon="🧼", 
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ─── BANNER CORPORATIVO CON LOGO Y ESTILOS CSS ─────────────────────────────
+# ─── ESTILOS Y PALETA DE COLORES CORPORATIVOS CASALIMPIA ──────────────────
 st.markdown("""
     <style>
-        .header-brand {
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        .main {
             background-color: #f8fafc;
-            border-left: 5px solid #0066cc;
+        }
+
+        /* Banner corporativo con logo */
+        .header-brand {
+            background: linear-gradient(135deg, #ffffff 0%, #f1f7fc 100%);
+            border-left: 6px solid #00529B;
             border-top: 1px solid #e2e8f0;
             border-right: 1px solid #e2e8f0;
             border-bottom: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 20px 28px;
+            margin-bottom: 28px;
+            box-shadow: 0 4px 6px -1px rgba(0, 82, 155, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         }
         .header-brand-content {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 24px;
         }
         .header-brand-content img {
-            height: 45px;
+            height: 52px;
             width: auto;
             object-fit: contain;
         }
         .title-text h1 {
-            color: #0066cc !important;
-            font-size: 20px !important;
+            color: #00529B !important;
+            font-size: 22px !important;
             font-weight: 700 !important;
             margin: 0 !important;
             padding: 0 !important;
             line-height: 1.2 !important;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            letter-spacing: -0.02em;
         }
         .title-text p {
-            color: #64748b !important;
-            font-size: 13px !important;
+            color: #475569 !important;
+            font-size: 13.5px !important;
             margin: 4px 0 0 0 !important;
             padding: 0 !important;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            font-weight: 500;
         }
 
-        /* Estilos del cargador de archivos de Streamlit */
+        /* Tarjetas / Secciones estilizadas */
+        .card-container {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #00529B;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0f2fe;
+        }
+
+        /* Estilos del cargador de archivos */
         [data-testid="stFileUploader"] {
             padding: 0px;
         }
         [data-testid="stFileUploaderDropzone"] {
-            padding: 8px 12px !important;
-            border: 1px dashed #bfc7d2 !important;
-            border-radius: 4px !important;
-            background-color: #f8f9fa !important;
+            padding: 12px 16px !important;
+            border: 1.5px dashed #00529B !important;
+            border-radius: 8px !important;
+            background-color: #f8fafc !important;
             display: flex !important;
             flex-direction: row !important;
             align-items: center !important;
             justify-content: flex-start !important;
             gap: 12px !important;
-            min-height: 45px !important;
+            min-height: 48px !important;
+            transition: all 0.2s ease;
+        }
+        [data-testid="stFileUploaderDropzone"]:hover {
+            background-color: #f0f7ff !important;
+            border-color: #003366 !important;
         }
         [data-testid="stFileUploaderDropzone"] section,
         [data-testid="stFileUploaderDropzone"] small,
@@ -79,29 +120,23 @@ st.markdown("""
             display: none !important;
         }
         [data-testid="stFileUploaderDropzone"]::before {
-            content: "Seleccionar archivo" !important;
+            content: "📁 Seleccionar archivo" !important;
             display: inline-block !important;
-            background-color: #f0f0f0 !important;
-            color: #333333 !important;
-            border: 1px solid #767676 !important;
-            border-radius: 2px !important;
-            padding: 3px 8px !important;
-            font-family: Arial, sans-serif !important;
+            background-color: #00529B !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 6px !important;
+            padding: 6px 14px !important;
             font-size: 13px !important;
+            font-weight: 500 !important;
             cursor: pointer !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         [data-testid="stFileUploaderDropzone"] button {
             display: none !important;
         }
         
-        /* Remoción de contenedores extras en la carga */
-        [data-testid="stFileUploaderDropzone"] > div {
-            background-color: transparent !important;
-            border: none !important;
-            padding: 0px !important;
-            margin: 0px !important;
-            box-shadow: none !important;
-        }
+        [data-testid="stFileUploaderDropzone"] > div,
         [data-testid="stFileUploaderRow"], 
         [data-testid="stFileUploaderRow"] > div {
             background-color: transparent !important;
@@ -117,11 +152,45 @@ st.markdown("""
             display: none !important;
         }
         [data-testid="stFileUploaderRow"] span {
-            font-family: Arial, sans-serif !important;
-            font-size: 14px !important;
-            color: #333333 !important;
-            font-weight: normal !important;
-            padding-left: 5px !important;
+            font-size: 13.5px !important;
+            color: #0f172a !important;
+            font-weight: 500 !important;
+            padding-left: 6px !important;
+        }
+
+        /* Botones estilizados */
+        div.stButton > button:first-child {
+            background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 10px 24px !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(0, 82, 155, 0.2) !important;
+            transition: all 0.2s ease !important;
+            width: 100%;
+        }
+        div.stButton > button:first-child:hover {
+            background: linear-gradient(135deg, #003366 0%, #002244 100%) !important;
+            box-shadow: 0 4px 8px rgba(0, 82, 155, 0.3) !important;
+            transform: translateY(-1px);
+        }
+
+        div.stDownloadButton > button:first-child {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 10px 24px !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2) !important;
+            width: 100%;
+        }
+        div.stDownloadButton > button:first-child:hover {
+            background: linear-gradient(135deg, #047857 0%, #065f46 100%) !important;
+            box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3) !important;
         }
     </style>
 
@@ -129,8 +198,8 @@ st.markdown("""
         <div class="header-brand-content">
             <img src="https://cdn1.totalcommerce.cloud/casalimpia/web_content/assets/logo-casa-limpia.svg" alt="Casalimpia Logo" />
             <div class="title-text">
-                <h1>Auditor TS</h1>
-                <p>Plataforma Para Auditar TS y Procesar Marcaciones</p>
+                <h1>Auditor TS & Módulo GeoVictoria</h1>
+                <p>Plataforma Corporativa de Procesamiento y Auditoría de Tiempos y Ausentismos</p>
             </div>
         </div>
     </div>
@@ -165,14 +234,12 @@ def procesar_plantilla_geovictoria(
     file_maestro, sheet_maestro,
     contrato_principal
 ):
-    # Cargar DataFrames desde memoria
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     df_hist = pd.read_excel(file_historial, sheet_name=sheet_historial) if file_historial else pd.DataFrame()
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
     df_maestro = pd.read_excel(file_maestro, sheet_name=sheet_maestro) if file_maestro else pd.DataFrame()
 
-    # Cargar Festivos
     set_festivos = set()
     if file_entrada:
         try:
@@ -183,10 +250,8 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ Nota: No se pudo cargar la hoja '{sheet_festivos}' ({e}). Se continuará sin marcar festivos.")
 
-    # Normalización de Cédulas en Marcaciones
     df_marc['Cédula_Str'] = df_marc.apply(lambda r: obtener_val_iloc(r, 2).replace('.0', ''), axis=1)
     
-    # Preprocesamiento de Historial Laboral
     if not df_hist.empty:
         df_hist['Cédula_Str'] = df_hist.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
         df_hist['Centro_Costo'] = df_hist.apply(lambda r: obtener_val_iloc(r, 2), axis=1)
@@ -201,7 +266,6 @@ def procesar_plantilla_geovictoria(
             df_hist['Fecha_Fin'] = pd.to_datetime('2099-12-31')
         df_hist['Frente_Trabajo'] = df_hist.apply(lambda r: obtener_val_iloc(r, 5), axis=1) if df_hist.shape[1] > 5 else df_hist['Centro_Costo']
 
-    # Preprocesamiento de Novasoft
     if not df_nova.empty:
         df_nova['Cédula_Str'] = df_nova.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
         df_nova['Concepto'] = df_nova.apply(lambda r: obtener_val_iloc(r, 2), axis=1)
@@ -209,7 +273,6 @@ def procesar_plantilla_geovictoria(
         df_nova['Fecha_Fin'] = pd.to_datetime(df_nova.iloc[:, 4], dayfirst=True, errors='coerce') if df_nova.shape[1] > 4 else pd.NaT
         df_nova['Codigo_Novasoft'] = df_nova.apply(lambda r: obtener_val_iloc(r, 9), axis=1)
 
-    # Preprocesamiento de Informe SIC
     if not df_sic.empty:
         df_sic['Cédula_Str'] = df_sic.apply(lambda r: obtener_val_iloc(r, 9).replace('.0', ''), axis=1)
         df_sic['Proceso'] = df_sic.apply(lambda r: obtener_val_iloc(r, 1), axis=1)
@@ -220,7 +283,6 @@ def procesar_plantilla_geovictoria(
         if df_sic.shape[1] > 5:
             df_sic['Fecha_Fin'] = pd.to_datetime(df_sic.iloc[:, 5], dayfirst=True, errors='coerce')
 
-    # Preprocesamiento de Base Maestro
     maestro_dict = {}
     if not df_maestro.empty:
         df_maestro['Cédula_Str'] = df_maestro.apply(lambda r: obtener_val_iloc(r, 1).replace('.0', ''), axis=1)
@@ -230,41 +292,48 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
-    # Cargar workbook original desde memoria
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
+    ws.views.sheetView[0].showGridLines = True
 
-    # Estilos de encabezados
+    # ── PALETA CORPORATIVA EXCEL (AZUL CASALIMPIA + TONOS MUTED) ──
     encabezados_estilos = [
-        ("AY1", "Fecha Ori", "D9EAD3", "000000", False),
-        ("AZ1", "Dia", "D9EAD3", "000000", False),
-        ("BA1", "Entrada2", "FF0000", "000000", False),
-        ("BB1", "Salida2", "FF0000", "000000", False),
-        ("BC1", "Cant HT", "BFBFBF", "000000", False),
-        ("BD1", "HT", "BFBFBF", "000000", False),
-        ("BE1", "Compensatorio", "1B678A", "FFFFFF", True),
-        ("BF1", "Ausencias / Marcaciones Erroneas", "B20000", "FFFFFF", True),
-        ("BG1", "Recargo Dominical No Compensado", "93D58C", "000000", False),
-        ("BH1", "Recargo Dominical Compensado", "FFFF00", "000000", False),
-        ("BI1", "Recargo Festivo", "F4A460", "000000", False),
-        ("BJ1", "Recargo Nocturno 0.35%", "5B9BD5", "000000", False),
-        ("BK1", "Horas Extras Diurnas 1.25%", "D9D2E9", "000000", False),
-        ("BL1", "Hora Extra Diurna Dom/Fest", "A2E4B8", "000000", False),
-        ("BM1", "Horas Extras Nocturnas 1.75%", "FF0000", "000000", False),
-        ("BN1", "Hora Extra Dominical o Festiva Nocturna", "C6EFCE", "000000", False),
-        ("BO1", "CCCO", "1B678A", "FFFFFF", True),
-        ("BP1", "Frente de trabajo", "1B678A", "FFFFFF", True),
-        ("BQ1", "Centro de costos", "1B678A", "FFFFFF", True),
-        ("BR1", "Fecha Ingreso", "1B678A", "FFFFFF", True),
-        ("BS1", "Validar Fingreso", "1B678A", "FFFFFF", True),
-        ("BT1", "F Retiro", "1B678A", "FFFFFF", True),
-        ("BU1", "Validar F Retiro", "1B678A", "FFFFFF", True),
-        ("BV1", "Ausentismo Novasoft", "FF0000", "FFFFFF", True),
-        ("BW1", "Codigo novasoft", "1B678A", "FFFFFF", True),
-        ("BX1", "Ausentismo Sic", "1B678A", "FFFFFF", True),
-        ("BY1", "Ausentismo", "FF0000", "FFFFFF", True)
+        ("AY1", "Fecha Ori", "D0E1F9", "002244", True),
+        ("AZ1", "Dia", "D0E1F9", "002244", True),
+        ("BA1", "Entrada2", "FCE8E6", "A80000", True),
+        ("BB1", "Salida2", "FCE8E6", "A80000", True),
+        ("BC1", "Cant HT", "E2E8F0", "1E293B", True),
+        ("BD1", "HT", "E2E8F0", "1E293B", True),
+        ("BE1", "Compensatorio", "00529B", "FFFFFF", True),
+        ("BF1", "Ausencias / Marcaciones Erroneas", "990000", "FFFFFF", True),
+        ("BG1", "Recargo Dominical No Compensado", "DCFCE7", "14532D", True),
+        ("BH1", "Recargo Dominical Compensado", "FEF08A", "713F12", True),
+        ("BI1", "Recargo Festivo", "FFEDD5", "7C2D12", True),
+        ("BJ1", "Recargo Nocturno 0.35%", "BAE6FD", "0369A1", True),
+        ("BK1", "Horas Extras Diurnas 1.25%", "E9D5FF", "581C87", True),
+        ("BL1", "Hora Extra Diurna Dom/Fest", "BBF7D0", "166534", True),
+        ("BM1", "Horas Extras Nocturnas 1.75%", "FECDD3", "9F1239", True),
+        ("BN1", "Hora Extra Dominical o Festiva Nocturna", "C6EFCE", "064E3B", True),
+        ("BO1", "CCCO", "003366", "FFFFFF", True),
+        ("BP1", "Frente de trabajo", "003366", "FFFFFF", True),
+        ("BQ1", "Centro de costos", "003366", "FFFFFF", True),
+        ("BR1", "Fecha Ingreso", "00529B", "FFFFFF", True),
+        ("BS1", "Validar Fingreso", "00529B", "FFFFFF", True),
+        ("BT1", "F Retiro", "00529B", "FFFFFF", True),
+        ("BU1", "Validar F Retiro", "00529B", "FFFFFF", True),
+        ("BV1", "Ausentismo Novasoft", "990000", "FFFFFF", True),
+        ("BW1", "Codigo novasoft", "00529B", "FFFFFF", True),
+        ("BX1", "Ausentismo Sic", "00529B", "FFFFFF", True),
+        ("BY1", "Ausentismo", "C00000", "FFFFFF", True)
     ]
+
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
 
     for celda_ref, titulo, color_bg, color_fg, es_negrita in encabezados_estilos:
         celda = ws[celda_ref]
@@ -272,6 +341,7 @@ def procesar_plantilla_geovictoria(
         celda.fill = PatternFill(start_color=color_bg, end_color=color_bg, fill_type="solid")
         celda.font = Font(name="Calibri", size=10, bold=es_negrita, color=color_fg)
         celda.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        celda.border = thin_border
 
     dias_semana_es = {0: "lunes", 1: "martes", 2: "miércoles", 3: "jueves", 4: "viernes", 5: "sábado", 6: "domingo"}
     hist_dict = {ced: grp for ced, grp in df_hist.groupby('Cédula_Str')} if not df_hist.empty else {}
@@ -279,14 +349,13 @@ def procesar_plantilla_geovictoria(
     sic_dict = {ced: grp for ced, grp in df_sic.groupby('Cédula_Str')} if not df_sic.empty else {}
     fecha_minima_valida = pd.to_datetime('1900-01-01')
 
-    # Barra de progreso
     progress_bar = st.progress(0)
+    status_text = st.empty()
     total_filas = len(df_marc)
 
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
-        # AY: Fecha Ori
         val_e = obtener_val_iloc(row, 4)
         fecha_ori = None
         if len(val_e) >= 10:
@@ -302,7 +371,6 @@ def procesar_plantilla_geovictoria(
         else:
             celda_ay.value = val_e
 
-        # AZ: Dia
         dia_nombre = ""
         if fecha_ori and pd.notna(fecha_ori):
             dia_nombre = dias_semana_es[fecha_ori.weekday()]
@@ -311,11 +379,9 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        # Lectura H, J, K, M
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
-        # BA y BB
         celda_ba, celda_bb = ws[f'BA{i}'], ws[f'BB{i}']
         hora_h, hora_m = convertir_a_hora(h_val), convertir_a_hora(m_val)
 
@@ -331,16 +397,13 @@ def procesar_plantilla_geovictoria(
         else:
             celda_bb.value = ""
 
-        # BC y BD
         ws[f'BC{i}'].value = f'=IF(OR(BA{i}="",BB{i}=""),"",MOD(BB{i}-BA{i},1))'
         ws[f'BC{i}'].number_format = '[h]:mm'
         ws[f'BD{i}'] = f'=IFERROR(ROUND(BC{i}*24,1),"")'
 
-        # BE: Compensatorio
         f_val = obtener_val_iloc(row, 5)
         ws[f'BE{i}'] = "C" if f_val == "Descanso compensatorio" else ""
 
-        # BF: Ausencias / Marcaciones Erroneas
         if h_val != "" and m_val != "":
             val_bf = ""
         elif dia_nombre.lower() == "domingo" or "festivo" in dia_nombre.lower():
@@ -352,7 +415,6 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BF{i}'] = val_bf
 
-        # BG a BN
         ws[f'BG{i}'] = f'=AM{i}+AO{i}'
         ws[f'BH{i}'] = f'=AI{i}+AK{i}'
         ws[f'BI{i}'] = f'=AQ{i}+AS{i}+AU{i}+AW{i}'
@@ -362,7 +424,6 @@ def procesar_plantilla_geovictoria(
         ws[f'BM{i}'] = f'=W{i}'
         ws[f'BN{i}'] = f'=AA{i}+AE{i}'
 
-        # BO: CCCO
         cedula_emp = row['Cédula_Str']
         val_bo = ""
         if cedula_emp in hist_dict and fecha_ori and pd.notna(fecha_ori):
@@ -377,7 +438,6 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BO{i}'] = val_bo
 
-        # BP y BQ
         val_bp_cc, val_bq_cc = "", ""
         if cedula_emp in hist_dict and fecha_ori and pd.notna(fecha_ori):
             sub_hist = hist_dict[cedula_emp]
@@ -397,7 +457,6 @@ def procesar_plantilla_geovictoria(
         ws[f'BP{i}'] = val_bp_cc
         ws[f'BQ{i}'] = val_bq_cc
 
-        # BR, BS, BT, BU
         celda_br, celda_bt = ws[f'BR{i}'], ws[f'BT{i}']
         val_bs, val_bu = "", ""
         datos_maestro = maestro_dict.get(cedula_emp, (pd.NaT, pd.NaT))
@@ -422,7 +481,6 @@ def procesar_plantilla_geovictoria(
         ws[f'BS{i}'] = val_bs
         ws[f'BU{i}'] = val_bu
 
-        # BV y BW
         val_bv_aus, val_bw_nova = val_bf, ""
         if val_bu == "Retirado":
             val_bv_aus = "Retiro"
@@ -445,7 +503,6 @@ def procesar_plantilla_geovictoria(
         ws[f'BV{i}'] = val_bv_aus
         ws[f'BW{i}'] = val_bw_nova
 
-        # BX y BY
         val_bx_sic = ""
         if cedula_emp in sic_dict and fecha_ori and pd.notna(fecha_ori):
             sub_sic = sic_dict[cedula_emp]
@@ -464,10 +521,15 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BY{i}'] = val_by_consolidado
 
-        # Actualizar progreso
-        progress_bar.progress((idx + 1) / total_filas)
+        for col_letra in ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'BO', 'BP', 'BQ', 'BR', 'BS', 'BT', 'BU', 'BV', 'BW', 'BX', 'BY']:
+            ws[f'{col_letra}{i}'].border = thin_border
 
-    # Guardar en memoria BytesIO
+        pct = (idx + 1) / total_filas
+        progress_bar.progress(pct)
+        status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
+
+    status_text.empty()
+    
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -476,41 +538,62 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-st.sidebar.header("⚙️ Configuración de Parámetros")
+st.sidebar.markdown("### ⚙️ Parámetros de Control")
 contrato_principal = st.sidebar.text_input("Contrato / Centro de Costos Principal", value="11CTR21013")
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Nota:** Carga los archivos en formato Excel `.xlsx`. Los cálculos y estilos corporativos se aplicarán automáticamente.")
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    st.subheader("Archivos Principales")
-    file_entrada = st.file_uploader("1. Archivo GeoVictoria / Marcaciones (.xlsx)", type=["xlsx"])
-    hoja_entrada = st.text_input("Nombre hoja Marcaciones", value="Marcaciones")
-    hoja_festivos = st.text_input("Nombre hoja Festivos", value="Festivos")
+    st.markdown("""
+        <div class="card-container">
+            <div class="section-header">
+                📁 <span>Archivos Principales</span>
+            </div>
+    """, unsafe_allow_html=True)
     
+    file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
+    hoja_entrada = st.text_input("Nombre de hoja Marcaciones", value="Marcaciones")
+    hoja_festivos = st.text_input("Nombre de hoja Festivos", value="Festivos")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     file_historial = st.file_uploader("2. Historial Laboral (.xlsx)", type=["xlsx"])
-    hoja_historial = st.text_input("Nombre hoja Historial", value="Hoja 1")
+    hoja_historial = st.text_input("Nombre de hoja Historial", value="Hoja 1")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with col2:
-    st.subheader("Archivos Complementarios")
+    st.markdown("""
+        <div class="card-container">
+            <div class="section-header">
+                📊 <span>Bases Complementarias</span>
+            </div>
+    """, unsafe_allow_html=True)
+    
     file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
-    hoja_novasoft = st.text_input("Nombre hoja Novasoft", value="BBDD_Novasof")
+    hoja_novasoft = st.text_input("Nombre de hoja Novasoft", value="BBDD_Novasof")
 
+    st.markdown("<br>", unsafe_allow_html=True)
     file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
-    hoja_sic = st.text_input("Nombre hoja SIC", value="Datos")
+    hoja_sic = st.text_input("Nombre de hoja SIC", value="Datos")
 
+    st.markdown("<br>", unsafe_allow_html=True)
     file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
-    hoja_maestro = st.text_input("Nombre hoja Maestro", value="NOM1911")
+    hoja_maestro = st.text_input("Nombre de hoja Maestro", value="NOM1911")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
-if st.button("🚀 Procesar Archivo", type="primary"):
+if st.button("🚀 Ejecutar Proceso y Aplicar Estilos Corporativos", type="primary"):
     if not file_entrada:
-        st.error("Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
+        st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
     elif not contrato_principal:
-        st.error("Por favor, ingresa el valor del Contrato Principal en la barra lateral.")
+        st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en la barra lateral.")
     else:
         try:
-            with st.spinner("Procesando marcaciones y consolidando datos..."):
+            with st.spinner("Procesando marcaciones, consolidando ausentismos y diseñando plantilla Excel..."):
                 excel_salida = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, hoja_festivos,
                     file_historial, hoja_historial,
@@ -520,13 +603,13 @@ if st.button("🚀 Procesar Archivo", type="primary"):
                     contrato_principal
                 )
 
-            st.success("¡Proceso finalizado con éxito!")
+            st.success("✨ ¡Proceso completado con éxito! Se han aplicado los estilos corporativos de Casalimpia a la plantilla Excel.")
             
             st.download_button(
-                label="📥 Descargar Excel Calculado",
+                label="📥 Descargar Plantilla Calculada (Excel)",
                 data=excel_salida,
-                file_name="Calculado_GeoVictoria.xlsx",
+                file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         except Exception as e:
-            st.error(f"Ocurrió un error durante el procesamiento: {str(e)}")
+            st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
