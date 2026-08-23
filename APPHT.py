@@ -20,30 +20,29 @@ st.set_page_config(
 # ─── ESTILOS Y PALETA DE COLORES CORPORATIVOS CASALIMPIA ──────────────────
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
         
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
+        #MainMenu, footer, header {visibility: hidden;}
         
         .main {
             background-color: #f8fafc;
         }
 
-        /* Banner corporativo con logo */
+        /* Banner corporativo pro */
         .header-brand {
-            background: linear-gradient(135deg, #ffffff 0%, #f1f7fc 100%);
+            background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
             border-left: 6px solid #00529B;
             border-top: 1px solid #e2e8f0;
             border-right: 1px solid #e2e8f0;
             border-bottom: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 20px 28px;
-            margin-bottom: 28px;
-            box-shadow: 0 4px 6px -1px rgba(0, 82, 155, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 16px;
+            padding: 24px 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px -2px rgba(0, 82, 155, 0.06);
         }
         .header-brand-content {
             display: flex;
@@ -51,13 +50,13 @@ st.markdown("""
             gap: 24px;
         }
         .header-brand-content img {
-            height: 52px;
+            height: 58px;
             width: auto;
             object-fit: contain;
         }
         .title-text h1 {
             color: #00529B !important;
-            font-size: 22px !important;
+            font-size: 24px !important;
             font-weight: 700 !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -65,54 +64,74 @@ st.markdown("""
             letter-spacing: -0.02em;
         }
         .title-text p {
-            color: #475569 !important;
-            font-size: 13.5px !important;
+            color: #64748b !important;
+            font-size: 14px !important;
             margin: 4px 0 0 0 !important;
             padding: 0 !important;
             font-weight: 500;
         }
 
-        /* Tarjetas / Secciones estilizadas */
+        /* Tarjetas Neumórficas / Glassmorphism suave */
         .card-container {
             background-color: #ffffff;
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 18px 22px;
+            border-radius: 14px;
+            padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            box-shadow: 0 2px 8px -2px rgba(0,0,0,0.04);
+            height: 100%;
         }
         .section-header {
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: space-between;
             color: #00529B;
             font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f7ff;
+        }
+
+        /* Status Badge para los archivos */
+        .file-status-ok {
+            background-color: #dcfce7;
+            color: #15803d;
+            font-size: 12px;
             font-weight: 600;
-            margin-bottom: 14px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e0f2fe;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .file-status-pending {
+            background-color: #f1f5f9;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 4px 10px;
+            border-radius: 20px;
         }
 
         /* Estilos del cargador de archivos */
         [data-testid="stFileUploader"] {
             padding: 0px;
+            margin-bottom: 12px;
         }
         [data-testid="stFileUploaderDropzone"] {
-            padding: 12px 16px !important;
-            border: 1.5px dashed #00529B !important;
-            border-radius: 8px !important;
+            padding: 10px 14px !important;
+            border: 1.5px dashed #cbd5e1 !important;
+            border-radius: 10px !important;
             background-color: #f8fafc !important;
             display: flex !important;
             flex-direction: row !important;
             align-items: center !important;
             justify-content: flex-start !important;
             gap: 12px !important;
-            min-height: 48px !important;
+            min-height: 46px !important;
             transition: all 0.2s ease;
         }
         [data-testid="stFileUploaderDropzone"]:hover {
             background-color: #f0f7ff !important;
-            border-color: #003366 !important;
+            border-color: #00529B !important;
         }
         [data-testid="stFileUploaderDropzone"] section,
         [data-testid="stFileUploaderDropzone"] small,
@@ -120,77 +139,55 @@ st.markdown("""
             display: none !important;
         }
         [data-testid="stFileUploaderDropzone"]::before {
-            content: "📁 Seleccionar archivo" !important;
+            content: "📄 Cargar" !important;
             display: inline-block !important;
             background-color: #00529B !important;
             color: #ffffff !important;
             border: none !important;
             border-radius: 6px !important;
-            padding: 6px 14px !important;
-            font-size: 13px !important;
-            font-weight: 500 !important;
+            padding: 5px 12px !important;
+            font-size: 12.5px !important;
+            font-weight: 600 !important;
             cursor: pointer !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         [data-testid="stFileUploaderDropzone"] button {
             display: none !important;
         }
-        
-        [data-testid="stFileUploaderDropzone"] > div,
-        [data-testid="stFileUploaderRow"], 
-        [data-testid="stFileUploaderRow"] > div {
-            background-color: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0px !important;
-            margin: 0px !important;
-        }
-        [data-testid="stFileUploaderRow"] svg,
-        [data-testid="stFileUploaderRow"] button,
-        [data-testid="stFileUploaderRow"] data,
-        [data-testid="stFileUploaderRow"] small {
-            display: none !important;
-        }
-        [data-testid="stFileUploaderRow"] span {
-            font-size: 13.5px !important;
-            color: #0f172a !important;
-            font-weight: 500 !important;
-            padding-left: 6px !important;
-        }
 
-        /* Botones estilizados */
+        /* Botón primario */
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
-            border-radius: 8px !important;
-            padding: 10px 24px !important;
-            font-weight: 600 !important;
-            font-size: 15px !important;
+            border-radius: 10px !important;
+            padding: 12px 28px !important;
+            font-weight: 700 !important;
+            font-size: 16px !important;
             border: none !important;
-            box-shadow: 0 2px 4px rgba(0, 82, 155, 0.2) !important;
+            box-shadow: 0 4px 12px rgba(0, 82, 155, 0.25) !important;
             transition: all 0.2s ease !important;
             width: 100%;
         }
         div.stButton > button:first-child:hover {
             background: linear-gradient(135deg, #003366 0%, #002244 100%) !important;
-            box-shadow: 0 4px 8px rgba(0, 82, 155, 0.3) !important;
+            box-shadow: 0 6px 16px rgba(0, 82, 155, 0.35) !important;
             transform: translateY(-1px);
         }
 
+        /* Botón de descarga */
         div.stDownloadButton > button:first-child {
             background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
             color: white !important;
-            border-radius: 8px !important;
-            padding: 10px 24px !important;
-            font-weight: 600 !important;
-            font-size: 15px !important;
+            border-radius: 10px !important;
+            padding: 12px 28px !important;
+            font-weight: 700 !important;
+            font-size: 16px !important;
             border: none !important;
-            box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2) !important;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
             width: 100%;
         }
         div.stDownloadButton > button:first-child:hover {
             background: linear-gradient(135deg, #047857 0%, #065f46 100%) !important;
-            box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3) !important;
+            box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35) !important;
         }
     </style>
 
@@ -297,7 +294,6 @@ def procesar_plantilla_geovictoria(
     ws = wb[sheet_entrada]
     ws.views.sheetView[0].showGridLines = True
 
-    # ── PALETA CORPORATIVA EXCEL (AZUL CASALIMPIA + TONOS MUTED) ──
     encabezados_estilos = [
         ("AY1", "Fecha Ori", "D0E1F9", "002244", True),
         ("AZ1", "Dia", "D0E1F9", "002244", True),
@@ -536,64 +532,79 @@ def procesar_plantilla_geovictoria(
     return output
 
 
-# ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
+# ─── INTERFAZ DE USUARIO REDISEÑADA ────────────────────────────────────────
 
-st.sidebar.markdown("### ⚙️ Parámetros de Control")
-contrato_principal = st.sidebar.text_input("Contrato / Centro de Costos Principal", value="11CTR21013")
+st.sidebar.markdown("## ⚙️ Parámetros")
+contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="11CTR21013")
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Nota:** Carga los archivos en formato Excel `.xlsx`. Los cálculos y estilos corporativos se aplicarán automáticamente.")
+st.sidebar.markdown("""
+<div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
+    <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
+    <small style="color: #475569;">1. Carga los archivos requeridos.<br>2. Revisa la palomita verde (Cargado).<br>3. Ejecuta la auditoría.</small>
+</div>
+""", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    st.markdown("""
+    # Contenedor Archivos Principales
+    file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
+    status_e = '<span class="file-status-ok">✔ Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente</span>'
+    
+    file_historial = st.file_uploader("2. Historial Laboral (.xlsx)", type=["xlsx"])
+    status_h = '<span class="file-status-ok">✔ Cargado</span>' if file_historial else '<span class="file-status-pending">Opcional</span>'
+
+    st.markdown(f"""
         <div class="card-container">
             <div class="section-header">
-                📁 <span>Archivos Principales</span>
+                <span>📌 Archivos Principales</span>
+                {status_e}
             </div>
+        </div>
     """, unsafe_allow_html=True)
-    
-    file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
-    hoja_entrada = st.text_input("Nombre de hoja Marcaciones", value="Marcaciones")
-    hoja_festivos = st.text_input("Nombre de hoja Festivos", value="Festivos")
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    file_historial = st.file_uploader("2. Historial Laboral (.xlsx)", type=["xlsx"])
-    hoja_historial = st.text_input("Nombre de hoja Historial", value="Hoja 1")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("""
+    # Contenedor Bases Complementarias
+    file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
+    file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
+    file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
+
+    count_comp = sum(1 for x in [file_novasoft, file_sic, file_maestro] if x is not None)
+    status_c = f'<span class="file-status-ok">✔ {count_comp}/3 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
+
+    st.markdown(f"""
         <div class="card-container">
             <div class="section-header">
-                📊 <span>Bases Complementarias</span>
+                <span>📊 Bases Complementarias</span>
+                {status_c}
             </div>
+        </div>
     """, unsafe_allow_html=True)
-    
-    file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
-    hoja_novasoft = st.text_input("Nombre de hoja Novasoft", value="BBDD_Novasof")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
-    hoja_sic = st.text_input("Nombre de hoja SIC", value="Datos")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
-    hoja_maestro = st.text_input("Nombre de hoja Maestro", value="NOM1911")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+# Acordeón limpio para nombres de pestañas (Avanzado)
+with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
+    st.caption("Solo modifica estos campos si el libro de Excel tiene nombres de hoja diferentes a los estándar.")
+    c_a, c_b = st.columns(2)
+    with c_a:
+        hoja_entrada = st.text_input("Hoja Marcaciones", value="Marcaciones")
+        hoja_festivos = st.text_input("Hoja Festivos", value="Festivos")
+        hoja_historial = st.text_input("Hoja Historial", value="Hoja 1")
+    with c_b:
+        hoja_novasoft = st.text_input("Hoja Novasoft", value="BBDD_Novasof")
+        hoja_sic = st.text_input("Hoja SIC", value="Datos")
+        hoja_maestro = st.text_input("Hoja Maestro", value="NOM1911")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-if st.button("🚀 Ejecutar Proceso", type="primary"):
+# Botón de Procesamiento
+if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"):
     if not file_entrada:
         st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
     elif not contrato_principal:
-        st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en la barra lateral.")
+        st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, consolidando ausentismos..."):
+            with st.spinner("Procesando marcaciones, cruzando información con Novasoft/SIC y aplicando estilos..."):
                 excel_salida = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, hoja_festivos,
                     file_historial, hoja_historial,
@@ -603,10 +614,10 @@ if st.button("🚀 Ejecutar Proceso", type="primary"):
                     contrato_principal
                 )
 
-            st.success("✨ ¡Proceso completado con éxito!")
+            st.success("✨ ¡Auditoría finalizada con éxito!")
             
             st.download_button(
-                label="📥 Descargar Plantilla Calculada (Excel)",
+                label="📥 Descargar Resultado Calculado (Excel)",
                 data=excel_salida,
                 file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
