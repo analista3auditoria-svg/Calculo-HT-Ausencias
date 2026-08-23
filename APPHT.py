@@ -586,14 +586,14 @@ with col2:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-if st.button("🚀 Ejecutar Proceso y Aplicar Estilos Corporativos", type="primary"):
+if st.button("🚀 Ejecutar Proceso", type="primary"):
     if not file_entrada:
         st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
     elif not contrato_principal:
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en la barra lateral.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, consolidando ausentismos y diseñando plantilla Excel..."):
+            with st.spinner("Procesando marcaciones, consolidando ausentismos..."):
                 excel_salida = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, hoja_festivos,
                     file_historial, hoja_historial,
@@ -603,7 +603,7 @@ if st.button("🚀 Ejecutar Proceso y Aplicar Estilos Corporativos", type="prima
                     contrato_principal
                 )
 
-            st.success("✨ ¡Proceso completado con éxito! Se han aplicado los estilos corporativos de Casalimpia a la plantilla Excel.")
+            st.success("✨ ¡Proceso completado con éxito!")
             
             st.download_button(
                 label="📥 Descargar Plantilla Calculada (Excel)",
