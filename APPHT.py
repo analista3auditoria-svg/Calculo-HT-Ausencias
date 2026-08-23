@@ -11,12 +11,133 @@ warnings.filterwarnings('ignore', category=UserWarning)
 
 # Configuración de página en Streamlit
 st.set_page_config(
-    page_title="Procesador GeoVictoria", 
+    page_title="Auditor TS - GeoVictoria", 
     page_icon="📊", 
     layout="wide"
 )
 
-# ─── FUNCIONES DE APOYO ───────────────────────────────────────────────────
+# ─── BANNER CORPORATIVO CON LOGO Y ESTILOS CSS ─────────────────────────────
+st.markdown("""
+    <style>
+        .header-brand {
+            background-color: #f8fafc;
+            border-left: 5px solid #0066cc;
+            border-top: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .header-brand-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .header-brand-content img {
+            height: 45px;
+            width: auto;
+            object-fit: contain;
+        }
+        .title-text h1 {
+            color: #0066cc !important;
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1.2 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        }
+        .title-text p {
+            color: #64748b !important;
+            font-size: 13px !important;
+            margin: 4px 0 0 0 !important;
+            padding: 0 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        }
+
+        /* Estilos del cargador de archivos de Streamlit */
+        [data-testid="stFileUploader"] {
+            padding: 0px;
+        }
+        [data-testid="stFileUploaderDropzone"] {
+            padding: 8px 12px !important;
+            border: 1px dashed #bfc7d2 !important;
+            border-radius: 4px !important;
+            background-color: #f8f9fa !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 12px !important;
+            min-height: 45px !important;
+        }
+        [data-testid="stFileUploaderDropzone"] section,
+        [data-testid="stFileUploaderDropzone"] small,
+        [data-testid="stFileUploaderDropzone"] svg {
+            display: none !important;
+        }
+        [data-testid="stFileUploaderDropzone"]::before {
+            content: "Seleccionar archivo" !important;
+            display: inline-block !important;
+            background-color: #f0f0f0 !important;
+            color: #333333 !important;
+            border: 1px solid #767676 !important;
+            border-radius: 2px !important;
+            padding: 3px 8px !important;
+            font-family: Arial, sans-serif !important;
+            font-size: 13px !important;
+            cursor: pointer !important;
+        }
+        [data-testid="stFileUploaderDropzone"] button {
+            display: none !important;
+        }
+        
+        /* Remoción de contenedores extras en la carga */
+        [data-testid="stFileUploaderDropzone"] > div {
+            background-color: transparent !important;
+            border: none !important;
+            padding: 0px !important;
+            margin: 0px !important;
+            box-shadow: none !important;
+        }
+        [data-testid="stFileUploaderRow"], 
+        [data-testid="stFileUploaderRow"] > div {
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0px !important;
+            margin: 0px !important;
+        }
+        [data-testid="stFileUploaderRow"] svg,
+        [data-testid="stFileUploaderRow"] button,
+        [data-testid="stFileUploaderRow"] data,
+        [data-testid="stFileUploaderRow"] small {
+            display: none !important;
+        }
+        [data-testid="stFileUploaderRow"] span {
+            font-family: Arial, sans-serif !important;
+            font-size: 14px !important;
+            color: #333333 !important;
+            font-weight: normal !important;
+            padding-left: 5px !important;
+        }
+    </style>
+
+    <div class="header-brand">
+        <div class="header-brand-content">
+            <img src="https://cdn1.totalcommerce.cloud/casalimpia/web_content/assets/logo-casa-limpia.svg" alt="Casalimpia Logo" />
+            <div class="title-text">
+                <h1>Auditor TS</h1>
+                <p>Plataforma Para Auditar TS y Procesar Marcaciones</p>
+            </div>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
+
+# ─── FUNCIONES DE APOYO Y PROCESAMIENTO ───────────────────────────────────
 
 def obtener_val_iloc(row, index_col):
     if len(row) > index_col and pd.notna(row.iloc[index_col]):
@@ -44,14 +165,14 @@ def procesar_plantilla_geovictoria(
     file_maestro, sheet_maestro,
     contrato_principal
 ):
-    # Cargar DataFrames desde memoria usando io.BytesIO
+    # Cargar DataFrames desde memoria
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     df_hist = pd.read_excel(file_historial, sheet_name=sheet_historial) if file_historial else pd.DataFrame()
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
     df_maestro = pd.read_excel(file_maestro, sheet_name=sheet_maestro) if file_maestro else pd.DataFrame()
 
-    # Festivos
+    # Cargar Festivos
     set_festivos = set()
     if file_entrada:
         try:
@@ -60,11 +181,12 @@ def procesar_plantilla_geovictoria(
                 fechas_fest = pd.to_datetime(df_festivos.iloc[:, 0], dayfirst=True, errors='coerce').dropna()
                 set_festivos = set(fechas_fest.dt.date)
         except Exception as e:
-            st.warning(f"⚠️ Nota: No se cargó la hoja de festivos '{sheet_festivos}' ({e}).")
+            st.warning(f"⚠️ Nota: No se pudo cargar la hoja '{sheet_festivos}' ({e}). Se continuará sin marcar festivos.")
 
-    # Normalizaciones de datos
+    # Normalización de Cédulas en Marcaciones
     df_marc['Cédula_Str'] = df_marc.apply(lambda r: obtener_val_iloc(r, 2).replace('.0', ''), axis=1)
     
+    # Preprocesamiento de Historial Laboral
     if not df_hist.empty:
         df_hist['Cédula_Str'] = df_hist.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
         df_hist['Centro_Costo'] = df_hist.apply(lambda r: obtener_val_iloc(r, 2), axis=1)
@@ -79,6 +201,7 @@ def procesar_plantilla_geovictoria(
             df_hist['Fecha_Fin'] = pd.to_datetime('2099-12-31')
         df_hist['Frente_Trabajo'] = df_hist.apply(lambda r: obtener_val_iloc(r, 5), axis=1) if df_hist.shape[1] > 5 else df_hist['Centro_Costo']
 
+    # Preprocesamiento de Novasoft
     if not df_nova.empty:
         df_nova['Cédula_Str'] = df_nova.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
         df_nova['Concepto'] = df_nova.apply(lambda r: obtener_val_iloc(r, 2), axis=1)
@@ -86,6 +209,7 @@ def procesar_plantilla_geovictoria(
         df_nova['Fecha_Fin'] = pd.to_datetime(df_nova.iloc[:, 4], dayfirst=True, errors='coerce') if df_nova.shape[1] > 4 else pd.NaT
         df_nova['Codigo_Novasoft'] = df_nova.apply(lambda r: obtener_val_iloc(r, 9), axis=1)
 
+    # Preprocesamiento de Informe SIC
     if not df_sic.empty:
         df_sic['Cédula_Str'] = df_sic.apply(lambda r: obtener_val_iloc(r, 9).replace('.0', ''), axis=1)
         df_sic['Proceso'] = df_sic.apply(lambda r: obtener_val_iloc(r, 1), axis=1)
@@ -96,6 +220,7 @@ def procesar_plantilla_geovictoria(
         if df_sic.shape[1] > 5:
             df_sic['Fecha_Fin'] = pd.to_datetime(df_sic.iloc[:, 5], dayfirst=True, errors='coerce')
 
+    # Preprocesamiento de Base Maestro
     maestro_dict = {}
     if not df_maestro.empty:
         df_maestro['Cédula_Str'] = df_maestro.apply(lambda r: obtener_val_iloc(r, 1).replace('.0', ''), axis=1)
@@ -105,7 +230,7 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
-    # Cargar workbook original directamente desde el archivo cargado
+    # Cargar workbook original desde memoria
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -154,14 +279,14 @@ def procesar_plantilla_geovictoria(
     sic_dict = {ced: grp for ced, grp in df_sic.groupby('Cédula_Str')} if not df_sic.empty else {}
     fecha_minima_valida = pd.to_datetime('1900-01-01')
 
-    # Progreso en Streamlit
+    # Barra de progreso
     progress_bar = st.progress(0)
     total_filas = len(df_marc)
 
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
-        # -- AY: Fecha Ori --
+        # AY: Fecha Ori
         val_e = obtener_val_iloc(row, 4)
         fecha_ori = None
         if len(val_e) >= 10:
@@ -177,7 +302,7 @@ def procesar_plantilla_geovictoria(
         else:
             celda_ay.value = val_e
 
-        # -- AZ: Dia --
+        # AZ: Dia
         dia_nombre = ""
         if fecha_ori and pd.notna(fecha_ori):
             dia_nombre = dias_semana_es[fecha_ori.weekday()]
@@ -190,7 +315,7 @@ def procesar_plantilla_geovictoria(
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
-        # ── BA y BB ──
+        # BA y BB
         celda_ba, celda_bb = ws[f'BA{i}'], ws[f'BB{i}']
         hora_h, hora_m = convertir_a_hora(h_val), convertir_a_hora(m_val)
 
@@ -206,16 +331,16 @@ def procesar_plantilla_geovictoria(
         else:
             celda_bb.value = ""
 
-        # ── BC y BD ──
+        # BC y BD
         ws[f'BC{i}'].value = f'=IF(OR(BA{i}="",BB{i}=""),"",MOD(BB{i}-BA{i},1))'
         ws[f'BC{i}'].number_format = '[h]:mm'
         ws[f'BD{i}'] = f'=IFERROR(ROUND(BC{i}*24,1),"")'
 
-        # -- BE: Compensatorio --
+        # BE: Compensatorio
         f_val = obtener_val_iloc(row, 5)
         ws[f'BE{i}'] = "C" if f_val == "Descanso compensatorio" else ""
 
-        # ── BF: Ausencias ──
+        # BF: Ausencias / Marcaciones Erroneas
         if h_val != "" and m_val != "":
             val_bf = ""
         elif dia_nombre.lower() == "domingo" or "festivo" in dia_nombre.lower():
@@ -227,7 +352,7 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BF{i}'] = val_bf
 
-        # -- BG a BN --
+        # BG a BN
         ws[f'BG{i}'] = f'=AM{i}+AO{i}'
         ws[f'BH{i}'] = f'=AI{i}+AK{i}'
         ws[f'BI{i}'] = f'=AQ{i}+AS{i}+AU{i}+AW{i}'
@@ -237,7 +362,7 @@ def procesar_plantilla_geovictoria(
         ws[f'BM{i}'] = f'=W{i}'
         ws[f'BN{i}'] = f'=AA{i}+AE{i}'
 
-        # ── BO: CCCO ──
+        # BO: CCCO
         cedula_emp = row['Cédula_Str']
         val_bo = ""
         if cedula_emp in hist_dict and fecha_ori and pd.notna(fecha_ori):
@@ -252,7 +377,7 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BO{i}'] = val_bo
 
-        # ── BP y BQ ──
+        # BP y BQ
         val_bp_cc, val_bq_cc = "", ""
         if cedula_emp in hist_dict and fecha_ori and pd.notna(fecha_ori):
             sub_hist = hist_dict[cedula_emp]
@@ -272,7 +397,7 @@ def procesar_plantilla_geovictoria(
         ws[f'BP{i}'] = val_bp_cc
         ws[f'BQ{i}'] = val_bq_cc
 
-        # ── BR, BS, BT, BU ──
+        # BR, BS, BT, BU
         celda_br, celda_bt = ws[f'BR{i}'], ws[f'BT{i}']
         val_bs, val_bu = "", ""
         datos_maestro = maestro_dict.get(cedula_emp, (pd.NaT, pd.NaT))
@@ -297,7 +422,7 @@ def procesar_plantilla_geovictoria(
         ws[f'BS{i}'] = val_bs
         ws[f'BU{i}'] = val_bu
 
-        # ── BV y BW ──
+        # BV y BW
         val_bv_aus, val_bw_nova = val_bf, ""
         if val_bu == "Retirado":
             val_bv_aus = "Retiro"
@@ -320,7 +445,7 @@ def procesar_plantilla_geovictoria(
         ws[f'BV{i}'] = val_bv_aus
         ws[f'BW{i}'] = val_bw_nova
 
-        # ── BX y BY ──
+        # BX y BY
         val_bx_sic = ""
         if cedula_emp in sic_dict and fecha_ori and pd.notna(fecha_ori):
             sub_sic = sic_dict[cedula_emp]
@@ -339,20 +464,17 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BY{i}'] = val_by_consolidado
 
-        # Actualizar la barra de progreso
+        # Actualizar progreso
         progress_bar.progress((idx + 1) / total_filas)
 
-    # Guardar en memoria (BytesIO)
+    # Guardar en memoria BytesIO
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
     return output
 
 
-# ─── INTERFAZ USER CON STREAMLIT ──────────────────────────────────────────
-
-st.title("📊 Procesador de Plantilla GeoVictoria")
-st.markdown("Carga los archivos requeridos en formato Excel para realizar la consolidación y cálculo del modelo TS.")
+# ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
 st.sidebar.header("⚙️ Configuración de Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / Centro de Costos Principal", value="11CTR21013")
@@ -388,7 +510,7 @@ if st.button("🚀 Procesar Archivo", type="primary"):
         st.error("Por favor, ingresa el valor del Contrato Principal en la barra lateral.")
     else:
         try:
-            with st.spinner("Procesando marcaciones y aplicando fórmulas..."):
+            with st.spinner("Procesando marcaciones y consolidando datos..."):
                 excel_salida = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, hoja_festivos,
                     file_historial, hoja_historial,
