@@ -71,15 +71,14 @@ st.markdown("""
             font-weight: 500;
         }
 
-        /* Tarjetas Neumórficas / Glassmorphism suave */
+        /* Tarjetas Neumórficas */
         .card-container {
             background-color: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 14px;
-            padding: 24px;
+            padding: 20px 24px;
             margin-bottom: 20px;
             box-shadow: 0 2px 8px -2px rgba(0,0,0,0.04);
-            height: 100%;
         }
         .section-header {
             display: flex;
@@ -88,12 +87,12 @@ st.markdown("""
             color: #00529B;
             font-size: 16px;
             font-weight: 700;
-            margin-bottom: 18px;
-            padding-bottom: 10px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
             border-bottom: 2px solid #f0f7ff;
         }
 
-        /* Status Badge para los archivos */
+        /* Status Badge */
         .file-status-ok {
             background-color: #dcfce7;
             color: #15803d;
@@ -229,6 +228,7 @@ def procesar_plantilla_geovictoria(
     file_novasoft, sheet_novasoft,
     file_sic, sheet_sic,
     file_maestro, sheet_maestro,
+    file_operativa, sheet_operativa,
     contrato_principal
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
@@ -236,6 +236,7 @@ def procesar_plantilla_geovictoria(
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
     df_maestro = pd.read_excel(file_maestro, sheet_name=sheet_maestro) if file_maestro else pd.DataFrame()
+    df_operativa = pd.read_excel(file_operativa, sheet_name=sheet_operativa) if file_operativa else pd.DataFrame()
 
     set_festivos = set()
     if file_entrada:
@@ -549,10 +550,9 @@ col1, col2 = st.columns(2, gap="large")
 with col1:
     # Contenedor Archivos Principales
     file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
-    status_e = '<span class="file-status-ok">✔ Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente</span>'
-    
     file_historial = st.file_uploader("2. Historial Laboral (.xlsx)", type=["xlsx"])
-    status_h = '<span class="file-status-ok">✔ Cargado</span>' if file_historial else '<span class="file-status-pending">Opcional</span>'
+
+    status_e = '<span class="file-status-ok">✔ Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente</span>'
 
     st.markdown(f"""
         <div class="card-container">
@@ -568,9 +568,10 @@ with col2:
     file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
     file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
     file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
+    file_operativa = st.file_uploader("6. Base Operativa (.xlsx)", type=["xlsx"])
 
-    count_comp = sum(1 for x in [file_novasoft, file_sic, file_maestro] if x is not None)
-    status_c = f'<span class="file-status-ok">✔ {count_comp}/3 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
+    count_comp = sum(1 for x in [file_novasoft, file_sic, file_maestro, file_operativa] if x is not None)
+    status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
 
     st.markdown(f"""
         <div class="card-container">
@@ -593,6 +594,7 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
         hoja_novasoft = st.text_input("Hoja Novasoft", value="BBDD_Novasof")
         hoja_sic = st.text_input("Hoja SIC", value="Datos")
         hoja_maestro = st.text_input("Hoja Maestro", value="NOM1911")
+        hoja_operativa = st.text_input("Hoja Operativa", value="Hoja1")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -611,6 +613,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     file_novasoft, hoja_novasoft,
                     file_sic, hoja_sic,
                     file_maestro, hoja_maestro,
+                    file_operativa, hoja_operativa,
                     contrato_principal
                 )
 
