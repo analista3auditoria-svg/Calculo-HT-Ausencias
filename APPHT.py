@@ -153,7 +153,7 @@ st.markdown("""
             display: none !important;
         }
 
-        /* Botón primario */
+        /* Botones estilizados */
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -172,7 +172,6 @@ st.markdown("""
             transform: translateY(-1px);
         }
 
-        /* Botón de descarga */
         div.stDownloadButton > button:first-child {
             background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
             color: white !important;
@@ -233,20 +232,35 @@ def procesar_plantilla_geovictoria(
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
-    # Cargar Base Operativa buscando la hoja "CONSOLIDADO"
-    df_operativa = pd.DataFrame()
+    # Preprocesamiento de Base Operativa
+    operativa_dict = {}
     if file_operativa:
         try:
             excel_op = pd.ExcelFile(file_operativa)
-            # Buscar concordancia insensible a mayúsculas/minúsculas o espacios
             target_sheet = sheet_operativa
             for name in excel_op.sheet_names:
                 if name.strip().upper() == sheet_operativa.strip().upper():
                     target_sheet = name
                     break
-            df_operativa = pd.read_excel(file_operativa, sheet_name=target_sheet)
+            df_op = pd.read_excel(file_operativa, sheet_name=target_sheet)
+            
+            if not df_op.empty:
+                # Normalizar Cédula (Columna A - índice 0)
+                df_op['Cédula_Str'] = df_op.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
+                # Normalizar Fecha (Columna C - índice 2)
+                df_op['Fecha_Dt'] = pd.to_datetime(df_op.iloc[:, 2], dayfirst=True, errors='coerce')
+                # Obtener Letra C (Columna I - índice 8)
+                df_op['Val_C'] = df_op.apply(lambda r: obtener_val_iloc(r, 8), axis=1)
+                
+                # Crear diccionario indexado por (Cédula, Fecha)
+                for _, row_op in df_op.iterrows():
+                    ced_op = row_op['Cédula_Str']
+                    f_op = row_op['Fecha_Dt']
+                    val_c = row_op['Val_C']
+                    if ced_op and pd.notna(f_op):
+                        operativa_dict[(ced_op, f_op.date())] = val_c
         except Exception as e:
-            st.warning(f"⚠️ No se pudo cargar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
+            st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
 
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
@@ -310,6 +324,7 @@ def procesar_plantilla_geovictoria(
     ws = wb[sheet_entrada]
     ws.views.sheetView[0].showGridLines = True
 
+    # Encabezados de Excel incluyendo BZ: Compensado
     encabezados_estilos = [
         ("AY1", "Fecha Ori", "D0E1F9", "002244", True),
         ("AZ1", "Dia", "D0E1F9", "002244", True),
@@ -337,7 +352,8 @@ def procesar_plantilla_geovictoria(
         ("BV1", "Ausentismo Novasoft", "990000", "FFFFFF", True),
         ("BW1", "Codigo novasoft", "00529B", "FFFFFF", True),
         ("BX1", "Ausentismo Sic", "00529B", "FFFFFF", True),
-        ("BY1", "Ausentismo", "C00000", "FFFFFF", True)
+        ("BY1", "Ausentismo", "C00000", "FFFFFF", True),
+        ("BZ1", "Compensado", "00529B", "FFFFFF", True) # Nueva Columna BZ
     ]
 
     thin_border = Border(
@@ -533,7 +549,15 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BY{i}'] = val_by_consolidado
 
-        for col_letra in ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'BO', 'BP', 'BQ', 'BR', 'BS', 'BT', 'BU', 'BV', 'BW', 'BX', 'BY']:
+        # ── BZ: Compensado (Cruze con Base Operativa por Cédula + Fecha) ──
+        val_bz_comp = ""
+        if cedula_emp and fecha_ori and pd.notna(fecha_ori):
+            key_op = (cedula_emp, fecha_ori.date())
+            val_bz_comp = operativa_dict.get(key_op, "")
+
+        ws[f'BZ{i}'] = val_bz_comp
+
+        for col_letra in ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'BO', 'BP', 'BQ', 'BR', 'BS', 'BT', 'BU', 'BV', 'BW', 'BX', 'BY', 'BZ']:
             ws[f'{col_letra}{i}'].border = thin_border
 
         pct = (idx + 1) / total_filas
@@ -548,7 +572,7 @@ def procesar_plantilla_geovictoria(
     return output
 
 
-# ─── INTERFAZ DE USUARIO REDISEÑADA ────────────────────────────────────────
+# ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
 st.sidebar.markdown("## ⚙️ Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="11CTR21013")
@@ -563,7 +587,6 @@ st.sidebar.markdown("""
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    # Bloque 1: Cargas 1 a 3
     file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
     file_operativa = st.file_uploader("2. Base Operativa (.xlsx)", type=["xlsx"])
     file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
@@ -580,7 +603,6 @@ with col1:
     """, unsafe_allow_html=True)
 
 with col2:
-    # Bloque 2: Cargas 4 a 6
     file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
     file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
     file_historial = st.file_uploader("6. Historial Laboral (.xlsx)", type=["xlsx"])
@@ -597,7 +619,6 @@ with col2:
         </div>
     """, unsafe_allow_html=True)
 
-# Acordeón limpio para nombres de pestañas (Avanzado)
 with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
     st.caption("Solo modifica estos campos si los libros de Excel tienen nombres de hoja diferentes a los estándar.")
     c_a, c_b = st.columns(2)
@@ -613,7 +634,6 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Botón de Procesamiento
 if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"):
     if not file_entrada:
         st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
