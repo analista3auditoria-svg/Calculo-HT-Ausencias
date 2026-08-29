@@ -224,19 +224,19 @@ def convertir_a_hora(val):
 
 def procesar_plantilla_geovictoria(
     file_entrada, sheet_entrada, sheet_festivos,
-    file_historial, sheet_historial,
+    file_operativa, sheet_operativa,
     file_novasoft, sheet_novasoft,
     file_sic, sheet_sic,
     file_maestro, sheet_maestro,
-    file_operativa, sheet_operativa,
+    file_historial, sheet_historial,
     contrato_principal
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
-    df_hist = pd.read_excel(file_historial, sheet_name=sheet_historial) if file_historial else pd.DataFrame()
+    df_operativa = pd.read_excel(file_operativa, sheet_name=sheet_operativa) if file_operativa else pd.DataFrame()
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
     df_maestro = pd.read_excel(file_maestro, sheet_name=sheet_maestro) if file_maestro else pd.DataFrame()
-    df_operativa = pd.read_excel(file_operativa, sheet_name=sheet_operativa) if file_operativa else pd.DataFrame()
+    df_hist = pd.read_excel(file_historial, sheet_name=sheet_historial) if file_historial else pd.DataFrame()
 
     set_festivos = set()
     if file_entrada:
@@ -541,42 +541,42 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Carga los archivos requeridos.<br>2. Revisa la palomita verde (Cargado).<br>3. Ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Carga los archivos requeridos.<br>2. Revisa las etiquetas de estado.<br>3. Ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    # Contenedor Archivos Principales
+    # Bloque 1: Cargas 1 a 3
     file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
-    file_historial = st.file_uploader("2. Historial Laboral (.xlsx)", type=["xlsx"])
+    file_operativa = st.file_uploader("2. Base Operativa (.xlsx)", type=["xlsx"])
+    file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
 
-    status_e = '<span class="file-status-ok">✔ Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente</span>'
+    status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
 
     st.markdown(f"""
         <div class="card-container">
             <div class="section-header">
-                <span>📌 Archivos Principales</span>
+                <span>📌 Archivos Principales & Operativos (1-3)</span>
                 {status_e}
             </div>
         </div>
     """, unsafe_allow_html=True)
 
 with col2:
-    # Contenedor Bases Complementarias
-    file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
+    # Bloque 2: Cargas 4 a 6
     file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
     file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
-    file_operativa = st.file_uploader("6. Base Operativa (.xlsx)", type=["xlsx"])
+    file_historial = st.file_uploader("6. Historial Laboral (.xlsx)", type=["xlsx"])
 
-    count_comp = sum(1 for x in [file_novasoft, file_sic, file_maestro, file_operativa] if x is not None)
-    status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
+    count_comp = sum(1 for x in [file_sic, file_maestro, file_historial] if x is not None)
+    status_c = f'<span class="file-status-ok">✔ {count_comp}/3 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
 
     st.markdown(f"""
         <div class="card-container">
             <div class="section-header">
-                <span>📊 Bases Complementarias</span>
+                <span>📊 Bases Complementarias (4-6)</span>
                 {status_c}
             </div>
         </div>
@@ -584,17 +584,17 @@ with col2:
 
 # Acordeón limpio para nombres de pestañas (Avanzado)
 with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
-    st.caption("Solo modifica estos campos si el libro de Excel tiene nombres de hoja diferentes a los estándar.")
+    st.caption("Solo modifica estos campos si los libros de Excel tienen nombres de hoja diferentes a los estándar.")
     c_a, c_b = st.columns(2)
     with c_a:
-        hoja_entrada = st.text_input("Hoja Marcaciones", value="Marcaciones")
+        hoja_entrada = st.text_input("1. Hoja Marcaciones", value="Marcaciones")
         hoja_festivos = st.text_input("Hoja Festivos", value="Festivos")
-        hoja_historial = st.text_input("Hoja Historial", value="Hoja 1")
+        hoja_operativa = st.text_input("2. Hoja Operativa", value="Hoja1")
+        hoja_novasoft = st.text_input("3. Hoja Novasoft", value="BBDD_Novasof")
     with c_b:
-        hoja_novasoft = st.text_input("Hoja Novasoft", value="BBDD_Novasof")
-        hoja_sic = st.text_input("Hoja SIC", value="Datos")
-        hoja_maestro = st.text_input("Hoja Maestro", value="NOM1911")
-        hoja_operativa = st.text_input("Hoja Operativa", value="Hoja1")
+        hoja_sic = st.text_input("4. Hoja SIC", value="Datos")
+        hoja_maestro = st.text_input("5. Hoja Maestro", value="NOM1911")
+        hoja_historial = st.text_input("6. Hoja Historial", value="Hoja 1")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -609,11 +609,11 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
             with st.spinner("Procesando marcaciones, cruzando información con Novasoft/SIC y aplicando estilos..."):
                 excel_salida = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, hoja_festivos,
-                    file_historial, hoja_historial,
+                    file_operativa, hoja_operativa,
                     file_novasoft, hoja_novasoft,
                     file_sic, hoja_sic,
                     file_maestro, hoja_maestro,
-                    file_operativa, hoja_operativa,
+                    file_historial, hoja_historial,
                     contrato_principal
                 )
 
