@@ -232,7 +232,22 @@ def procesar_plantilla_geovictoria(
     contrato_principal
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
-    df_operativa = pd.read_excel(file_operativa, sheet_name=sheet_operativa) if file_operativa else pd.DataFrame()
+    
+    # Cargar Base Operativa buscando la hoja "CONSOLIDADO"
+    df_operativa = pd.DataFrame()
+    if file_operativa:
+        try:
+            excel_op = pd.ExcelFile(file_operativa)
+            # Buscar concordancia insensible a mayúsculas/minúsculas o espacios
+            target_sheet = sheet_operativa
+            for name in excel_op.sheet_names:
+                if name.strip().upper() == sheet_operativa.strip().upper():
+                    target_sheet = name
+                    break
+            df_operativa = pd.read_excel(file_operativa, sheet_name=target_sheet)
+        except Exception as e:
+            st.warning(f"⚠️ No se pudo cargar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
+
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
     df_maestro = pd.read_excel(file_maestro, sheet_name=sheet_maestro) if file_maestro else pd.DataFrame()
@@ -589,7 +604,7 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
     with c_a:
         hoja_entrada = st.text_input("1. Hoja Marcaciones", value="Marcaciones")
         hoja_festivos = st.text_input("Hoja Festivos", value="Festivos")
-        hoja_operativa = st.text_input("2. Hoja Operativa", value="Hoja1")
+        hoja_operativa = st.text_input("2. Hoja Operativa", value="CONSOLIDADO")
         hoja_novasoft = st.text_input("3. Hoja Novasoft", value="BBDD_Novasof")
     with c_b:
         hoja_sic = st.text_input("4. Hoja SIC", value="Datos")
