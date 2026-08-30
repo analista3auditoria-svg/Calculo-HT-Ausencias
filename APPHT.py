@@ -21,7 +21,7 @@ st.set_page_config(
 # ─── ESTILOS Y PALETA DE COLORES CORPORATIVOS CASALIMPIA ──────────────────
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         
         * {
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -109,6 +109,61 @@ st.markdown("""
             font-weight: 500;
             padding: 4px 10px;
             border-radius: 20px;
+        }
+
+        /* Estilos KPI Cards */
+        .kpi-card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 20px 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+        }
+        .kpi-card-danger {
+            border-left: 6px solid #dc2626;
+            background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+        }
+        .kpi-card-warning {
+            border-left: 6px solid #d97706;
+            background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+        }
+        .kpi-card-info {
+            border-left: 6px solid #00529B;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
+        }
+        .kpi-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+        .kpi-title-danger { color: #991b1b; }
+        .kpi-title-warning { color: #92400e; }
+        .kpi-title-info { color: #00529B; }
+
+        .kpi-value {
+            font-size: 36px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .kpi-value-danger { color: #dc2626; }
+        .kpi-value-warning { color: #d97706; }
+        .kpi-value-info { color: #00529B; }
+
+        .kpi-subtitle {
+            font-size: 12px;
+            font-weight: 500;
+            color: #64748b;
         }
 
         /* Estilos del cargador de archivos */
@@ -260,7 +315,7 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
 
-    # Preprocesamiento y Filtrado de BD Supernumerario buscando la hoja por defecto "Base"
+    # Preprocesamiento BD Supernumerario
     df_super_filtrado = pd.DataFrame()
     if file_supernumerario:
         try:
@@ -275,7 +330,6 @@ def procesar_plantilla_geovictoria(
             if not df_sup_raw.empty and df_sup_raw.shape[1] > 12:
                 col_m_val = df_sup_raw.iloc[:, 12].astype(str).str.strip().str.upper()
                 contrato_target = str(contrato_principal).strip().upper()
-                
                 df_super_filtrado = df_sup_raw[col_m_val.str.contains(contrato_target, regex=False, na=False)].copy()
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la BD Supernumerario (hoja '{sheet_supernumerario}'): {e}")
@@ -398,6 +452,10 @@ def procesar_plantilla_geovictoria(
     progress_bar = st.progress(0)
     status_text = st.empty()
     total_filas = len(df_marc)
+
+    # Variables para conteo de KPIs
+    conteo_ausencias = 0
+    conteo_p = 0
 
     for idx, row in df_marc.iterrows():
         i = idx + 2
@@ -582,6 +640,13 @@ def procesar_plantilla_geovictoria(
 
         ws[f'CA{i}'] = val_ca_aus_real
 
+        # Conteo para KPIs
+        ca_val_clean = str(val_ca_aus_real).strip()
+        if ca_val_clean.lower() == "ausencia":
+            conteo_ausencias += 1
+        elif ca_val_clean.upper() == "P":
+            conteo_p += 1
+
         for col_letra in ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'BO', 'BP', 'BQ', 'BR', 'BS', 'BT', 'BU', 'BV', 'BW', 'BX', 'BY', 'BZ', 'CA']:
             ws[f'{col_letra}{i}'].border = thin_border
 
@@ -614,7 +679,7 @@ def procesar_plantilla_geovictoria(
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    return output
+    return output, conteo_ausencias, conteo_p, total_filas
 
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
@@ -689,7 +754,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
     else:
         try:
             with st.spinner("Procesando marcaciones, filtrando supernumerarios y aplicando estilos..."):
-                excel_salida = procesar_plantilla_geovictoria(
+                excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
                     file_novasoft=file_novasoft, sheet_novasoft=hoja_novasoft,
@@ -700,7 +765,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal
                 )
 
-            st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Supernumerario' creada leyendo la pestaña 'Base'.")
+            st.success("✨ ¡Auditoría finalizada con éxito!")
             
             st.download_button(
                 label="📥 Descargar Resultado Calculado (Excel)",
@@ -708,5 +773,37 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                 file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+            # ── METRICAS / KPIs DESTACADOS ──
+            st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
+            kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+
+            with kpi_col1:
+                st.markdown(f"""
+                    <div class="kpi-card kpi-card-danger">
+                        <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
+                        <div class="kpi-value kpi-value-danger">{kpi_ausencias:,}</div>
+                        <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_col2:
+                st.markdown(f"""
+                    <div class="kpi-card kpi-card-warning">
+                        <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
+                        <div class="kpi-value kpi-value-warning">{kpi_p:,}</div>
+                        <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_col3:
+                st.markdown(f"""
+                    <div class="kpi-card kpi-card-info">
+                        <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
+                        <div class="kpi-value kpi-value-info">{total_filas:,}</div>
+                        <div class="kpi-subtitle">Filas evaluadas en el periodo</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
         except Exception as e:
             st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
