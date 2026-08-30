@@ -245,14 +245,10 @@ def procesar_plantilla_geovictoria(
             df_op = pd.read_excel(file_operativa, sheet_name=target_sheet)
             
             if not df_op.empty:
-                # Normalizar Cédula (Columna A - índice 0)
                 df_op['Cédula_Str'] = df_op.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
-                # Normalizar Fecha (Columna C - índice 2)
                 df_op['Fecha_Dt'] = pd.to_datetime(df_op.iloc[:, 2], dayfirst=True, errors='coerce')
-                # Obtener Letra C (Columna I - índice 8)
                 df_op['Val_C'] = df_op.apply(lambda r: obtener_val_iloc(r, 8), axis=1)
                 
-                # Crear diccionario indexado por (Cédula, Fecha)
                 for _, row_op in df_op.iterrows():
                     ced_op = row_op['Cédula_Str']
                     f_op = row_op['Fecha_Dt']
@@ -324,7 +320,7 @@ def procesar_plantilla_geovictoria(
     ws = wb[sheet_entrada]
     ws.views.sheetView[0].showGridLines = True
 
-    # Encabezados de Excel incluyendo BZ: Compensado
+    # Encabezados de Excel incluyendo BZ: Compensado y CA: Ausentismo Real
     encabezados_estilos = [
         ("AY1", "Fecha Ori", "D0E1F9", "002244", True),
         ("AZ1", "Dia", "D0E1F9", "002244", True),
@@ -353,7 +349,8 @@ def procesar_plantilla_geovictoria(
         ("BW1", "Codigo novasoft", "00529B", "FFFFFF", True),
         ("BX1", "Ausentismo Sic", "00529B", "FFFFFF", True),
         ("BY1", "Ausentismo", "C00000", "FFFFFF", True),
-        ("BZ1", "Compensado", "00529B", "FFFFFF", True) # Nueva Columna BZ
+        ("BZ1", "Compensado", "00529B", "FFFFFF", True),
+        ("CA1", "Ausentismo Real", "1E4620", "FFFFFF", True) # Nueva Columna CA
     ]
 
     thin_border = Border(
@@ -549,7 +546,7 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BY{i}'] = val_by_consolidado
 
-        # ── BZ: Compensado (Cruze con Base Operativa por Cédula + Fecha) ──
+        # ── BZ: Compensado ──
         val_bz_comp = ""
         if cedula_emp and fecha_ori and pd.notna(fecha_ori):
             key_op = (cedula_emp, fecha_ori.date())
@@ -557,7 +554,14 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BZ{i}'] = val_bz_comp
 
-        for col_letra in ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'BO', 'BP', 'BQ', 'BR', 'BS', 'BT', 'BU', 'BV', 'BW', 'BX', 'BY', 'BZ']:
+        # ── CA: Ausentismo Real (Regla: Si BY es Ausencia/Descanso/P y BZ es C -> Asigna C, sino deja BY) ──
+        val_ca_aus_real = val_by_consolidado
+        if str(val_by_consolidado).strip().lower() in ["ausencia", "descanso", "p"] and str(val_bz_comp).strip().upper() == "C":
+            val_ca_aus_real = "C"
+
+        ws[f'CA{i}'] = val_ca_aus_real
+
+        for col_letra in ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI', 'BJ', 'BK', 'BL', 'BM', 'BN', 'BO', 'BP', 'BQ', 'BR', 'BS', 'BT', 'BU', 'BV', 'BW', 'BX', 'BY', 'BZ', 'CA']:
             ws[f'{col_letra}{i}'].border = thin_border
 
         pct = (idx + 1) / total_filas
@@ -643,13 +647,13 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         try:
             with st.spinner("Procesando marcaciones, cruzando información con Novasoft/SIC y aplicando estilos..."):
                 excel_salida = procesar_plantilla_geovictoria(
-                    file_entrada, hoja_entrada, hoja_festivos,
-                    file_operativa, hoja_operativa,
-                    file_novasoft, hoja_novasoft,
-                    file_sic, hoja_sic,
-                    file_maestro, hoja_maestro,
-                    file_historial, hoja_historial,
-                    contrato_principal
+                    file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
+                    file_operativa=file_operativa, sheet_operativa=hoja_operativa,
+                    file_novasoft=file_novasoft, sheet_novasoft=hoja_novasoft,
+                    file_sic=file_sic, sheet_sic=hoja_sic,
+                    file_maestro=file_maestro, sheet_maestro=hoja_maestro,
+                    file_historial=file_historial, sheet_historial=hoja_historial,
+                    contrato_principal=contrato_principal
                 )
 
             st.success("✨ ¡Auditoría finalizada con éxito!")
