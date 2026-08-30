@@ -260,7 +260,7 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
 
-    # Preprocesamiento y Filtrado de BD Supernumerario por Contrato Principal (Columna M - Índice 12)
+    # Preprocesamiento y Filtrado de BD Supernumerario buscando la hoja por defecto "Base"
     df_super_filtrado = pd.DataFrame()
     if file_supernumerario:
         try:
@@ -273,13 +273,12 @@ def procesar_plantilla_geovictoria(
             df_sup_raw = pd.read_excel(file_supernumerario, sheet_name=target_sheet_sup)
             
             if not df_sup_raw.empty and df_sup_raw.shape[1] > 12:
-                # Filtrar en la columna M (índice 12) comparando con el valor del contrato_principal
                 col_m_val = df_sup_raw.iloc[:, 12].astype(str).str.strip().str.upper()
                 contrato_target = str(contrato_principal).strip().upper()
                 
                 df_super_filtrado = df_sup_raw[col_m_val.str.contains(contrato_target, regex=False, na=False)].copy()
         except Exception as e:
-            st.warning(f"⚠️ No se pudo procesar la BD Supernumerario: {e}")
+            st.warning(f"⚠️ No se pudo procesar la BD Supernumerario (hoja '{sheet_supernumerario}'): {e}")
 
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
@@ -343,7 +342,6 @@ def procesar_plantilla_geovictoria(
     ws = wb[sheet_entrada]
     ws.views.sheetView[0].showGridLines = True
 
-    # Encabezados
     encabezados_estilos = [
         ("AY1", "Fecha Ori", "D0E1F9", "002244", True),
         ("AZ1", "Dia", "D0E1F9", "002244", True),
@@ -591,7 +589,7 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
-    # ── CREACIÓN DE LA HOJA "Supernumerario" CON EL FILTRADO DE LA BD ──
+    # Creación de la hoja "Supernumerario"
     if not df_super_filtrado.empty:
         if "Supernumerario" in wb.sheetnames:
             ws_sup = wb["Supernumerario"]
@@ -601,7 +599,6 @@ def procesar_plantilla_geovictoria(
         
         ws_sup.views.sheetView[0].showGridLines = True
         
-        # Volcar DataFrame filtrado a la hoja
         for r_idx, r in enumerate(dataframe_to_rows(df_super_filtrado, index=False, header=True), start=1):
             ws_sup.append(r)
             for c_idx in range(1, len(r) + 1):
@@ -680,7 +677,7 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
         hoja_sic = st.text_input("4. Hoja SIC", value="Datos")
         hoja_maestro = st.text_input("5. Hoja Maestro", value="NOM1911")
         hoja_historial = st.text_input("6. Hoja Historial", value="Hoja 1")
-        hoja_supernumerario = st.text_input("7. Hoja Supernumerario", value="BD Supernumerario")
+        hoja_supernumerario = st.text_input("7. Hoja Supernumerario", value="Base")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -703,7 +700,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal
                 )
 
-            st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Supernumerario' creada con el filtro de la Columna M.")
+            st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Supernumerario' creada leyendo la pestaña 'Base'.")
             
             st.download_button(
                 label="📥 Descargar Resultado Calculado (Excel)",
