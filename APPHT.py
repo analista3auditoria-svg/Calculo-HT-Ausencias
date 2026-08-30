@@ -27,11 +27,9 @@ st.markdown("""
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        /* Ocultar elementos innecesarios manteniendo la barra lateral visible */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         
-        /* Asegurar que la barra lateral y su botón permancezcan visibles */
         [data-testid="stSidebar"] {
             display: block !important;
             visibility: visible !important;
@@ -44,7 +42,6 @@ st.markdown("""
             background-color: #f8fafc;
         }
 
-        /* Banner corporativo pro */
         .header-brand {
             background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
             border-left: 6px solid #00529B;
@@ -83,7 +80,6 @@ st.markdown("""
             font-weight: 500;
         }
 
-        /* Tarjetas Neumórficas */
         .card-container {
             background-color: #ffffff;
             border: 1px solid #e2e8f0;
@@ -104,7 +100,6 @@ st.markdown("""
             border-bottom: 2px solid #f0f7ff;
         }
 
-        /* Status Badge */
         .file-status-ok {
             background-color: #dcfce7;
             color: #15803d;
@@ -122,7 +117,6 @@ st.markdown("""
             border-radius: 20px;
         }
 
-        /* Estilos KPI Cards */
         .kpi-card {
             background-color: #ffffff;
             border-radius: 16px;
@@ -177,7 +171,6 @@ st.markdown("""
             color: #64748b;
         }
 
-        /* Estilos del cargador de archivos */
         [data-testid="stFileUploader"] {
             padding: 0px;
             margin-bottom: 12px;
@@ -220,7 +213,6 @@ st.markdown("""
             display: none !important;
         }
 
-        /* Botones estilizados */
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -444,6 +436,9 @@ def procesar_plantilla_geovictoria(
         bottom=Side(style='thin', color='CBD5E1')
     )
 
+    fill_ausencia_rojo = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
+    font_ausencia_blanco = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
     for celda_ref, titulo, color_bg, color_fg, es_negrita in encabezados_estilos:
         celda = ws[celda_ref]
         celda.value = titulo
@@ -646,11 +641,15 @@ def procesar_plantilla_geovictoria(
         if str(val_by_consolidado).strip().lower() in ["ausencia", "descanso", "p"] and str(val_bz_comp).strip().upper() == "C":
             val_ca_aus_real = "C"
 
-        ws[f'CA{i}'] = val_ca_aus_real
+        celda_ca = ws[f'CA{i}']
+        celda_ca.value = val_ca_aus_real
 
-        # Conteo para KPIs
+        # ── Formato especial con relleno rojo e híper destacado para "Ausencia" ──
         ca_val_clean = str(val_ca_aus_real).strip()
         if ca_val_clean.lower() == "ausencia":
+            celda_ca.fill = fill_ausencia_rojo
+            celda_ca.font = font_ausencia_blanco
+            celda_ca.alignment = Alignment(horizontal="center", vertical="center")
             conteo_ausencias += 1
         elif ca_val_clean.upper() == "P":
             conteo_p += 1
@@ -692,7 +691,7 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# Configuración del Panel Lateral (⚙️ Parámetros)
+# Configuración del Panel Lateral
 st.sidebar.markdown("## ⚙️ Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
 st.sidebar.markdown("---")
