@@ -289,7 +289,6 @@ def procesar_plantilla_geovictoria(
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
-    # Preprocesamiento Base Operativa
     operativa_dict = {}
     if file_operativa:
         try:
@@ -315,7 +314,6 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
 
-    # Preprocesamiento BD Supernumerario
     df_super_filtrado = pd.DataFrame()
     if file_supernumerario:
         try:
@@ -453,7 +451,6 @@ def procesar_plantilla_geovictoria(
     status_text = st.empty()
     total_filas = len(df_marc)
 
-    # Variables para conteo de KPIs
     conteo_ausencias = 0
     conteo_p = 0
 
@@ -690,46 +687,49 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Carga los archivos requeridos.<br>2. Revisa las etiquetas de estado.<br>3. Ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Revisa la etiqueta de estado.<br>3. Ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
-col1, col2 = st.columns(2, gap="large")
+# ── 1. ACORDEÓN PRINCIPAL: "Bases de datos" ──
+with st.expander("📁 Bases de datos", expanded=True):
+    col1, col2 = st.columns(2, gap="large")
 
-with col1:
-    file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
-    file_operativa = st.file_uploader("2. Base Operativa (.xlsx)", type=["xlsx"])
-    file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
-    file_supernumerario = st.file_uploader("7. BD Supernumerario (.xlsx)", type=["xlsx"])
+    with col1:
+        file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
+        file_operativa = st.file_uploader("2. Base Operativa (.xlsx)", type=["xlsx"])
+        file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
+        file_supernumerario = st.file_uploader("7. BD Supernumerario (.xlsx)", type=["xlsx"])
 
-    status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
+        status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
 
-    st.markdown(f"""
-        <div class="card-container">
-            <div class="section-header">
-                <span>📌 Archivos Principales & Operativos</span>
-                {status_e}
+        st.markdown(f"""
+            <div class="card-container">
+                <div class="section-header">
+                    <span>📌 Archivos Principales & Operativos</span>
+                    {status_e}
+                </div>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-with col2:
-    file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
-    file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
-    file_historial = st.file_uploader("6. Historial Laboral (.xlsx)", type=["xlsx"])
+    with col2:
+        file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
+        file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
+        file_historial = st.file_uploader("6. Historial Laboral (.xlsx)", type=["xlsx"])
 
-    count_comp = sum(1 for x in [file_sic, file_maestro, file_historial, file_supernumerario] if x is not None)
-    status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
+        count_comp = sum(1 for x in [file_sic, file_maestro, file_historial, file_supernumerario] if x is not None)
+        status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
 
-    st.markdown(f"""
-        <div class="card-container">
-            <div class="section-header">
-                <span>📊 Bases Complementarias</span>
-                {status_c}
+        st.markdown(f"""
+            <div class="card-container">
+                <div class="section-header">
+                    <span>📊 Bases Complementarias</span>
+                    {status_c}
+                </div>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
+# ── 2. ACORDEÓN SECUNDARIO: Configuración Avanzada ──
 with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
     st.caption("Solo modifica estos campos si los libros de Excel tienen nombres de hoja diferentes a los estándar.")
     c_a, c_b = st.columns(2)
@@ -746,6 +746,7 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# Botón de Procesamiento
 if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"):
     if not file_entrada:
         st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
@@ -765,45 +766,53 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal
                 )
 
-            st.success("✨ ¡Auditoría finalizada con éxito!")
-            
-            st.download_button(
-                label="📥 Descargar Resultado Calculado (Excel)",
-                data=excel_salida,
-                file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-            # ── METRICAS / KPIs DESTACADOS ──
-            st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
-            kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-
-            with kpi_col1:
-                st.markdown(f"""
-                    <div class="kpi-card kpi-card-danger">
-                        <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
-                        <div class="kpi-value kpi-value-danger">{kpi_ausencias:,}</div>
-                        <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with kpi_col2:
-                st.markdown(f"""
-                    <div class="kpi-card kpi-card-warning">
-                        <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
-                        <div class="kpi-value kpi-value-warning">{kpi_p:,}</div>
-                        <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with kpi_col3:
-                st.markdown(f"""
-                    <div class="kpi-card kpi-card-info">
-                        <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
-                        <div class="kpi-value kpi-value-info">{total_filas:,}</div>
-                        <div class="kpi-subtitle">Filas evaluadas en el periodo</div>
-                    </div>
-                """, unsafe_allow_html=True)
+            # Guardar en st.session_state para mantener la vista permanente
+            st.session_state["procesado_exitoso"] = True
+            st.session_state["excel_salida"] = excel_salida
+            st.session_state["kpi_ausencias"] = kpi_ausencias
+            st.session_state["kpi_p"] = kpi_p
+            st.session_state["total_filas"] = total_filas
 
         except Exception as e:
             st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
+
+# ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
+if st.session_state.get("procesado_exitoso", False):
+    st.success("✨ ¡Auditoría finalizada con éxito!")
+    
+    st.download_button(
+        label="📥 Descargar Resultado Calculado (Excel)",
+        data=st.session_state["excel_salida"],
+        file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
+    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+
+    with kpi_col1:
+        st.markdown(f"""
+            <div class="kpi-card kpi-card-danger">
+                <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
+                <div class="kpi-value kpi-value-danger">{st.session_state["kpi_ausencias"]:,}</div>
+                <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with kpi_col2:
+        st.markdown(f"""
+            <div class="kpi-card kpi-card-warning">
+                <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
+                <div class="kpi-value kpi-value-warning">{st.session_state["kpi_p"]:,}</div>
+                <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with kpi_col3:
+        st.markdown(f"""
+            <div class="kpi-card kpi-card-info">
+                <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
+                <div class="kpi-value kpi-value-info">{st.session_state["total_filas"]:,}</div>
+                <div class="kpi-subtitle">Filas evaluadas en el periodo</div>
+            </div>
+        """, unsafe_allow_html=True)
