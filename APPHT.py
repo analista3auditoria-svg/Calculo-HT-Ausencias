@@ -4,6 +4,7 @@ import warnings
 import pandas as pd
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils.dataframe import dataframe_to_rows
 import streamlit as st
 
 # Ocultar advertencias no críticas
@@ -228,11 +229,12 @@ def procesar_plantilla_geovictoria(
     file_sic, sheet_sic,
     file_maestro, sheet_maestro,
     file_historial, sheet_historial,
+    file_supernumerario, sheet_supernumerario,
     contrato_principal
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
-    # Preprocesamiento de Base Operativa
+    # Preprocesamiento Base Operativa
     operativa_dict = {}
     if file_operativa:
         try:
@@ -257,6 +259,27 @@ def procesar_plantilla_geovictoria(
                         operativa_dict[(ced_op, f_op.date())] = val_c
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
+
+    # Preprocesamiento y Filtrado de BD Supernumerario por Contrato Principal (Columna M - Índice 12)
+    df_super_filtrado = pd.DataFrame()
+    if file_supernumerario:
+        try:
+            excel_sup = pd.ExcelFile(file_supernumerario)
+            target_sheet_sup = sheet_supernumerario
+            for name in excel_sup.sheet_names:
+                if name.strip().upper() == sheet_supernumerario.strip().upper():
+                    target_sheet_sup = name
+                    break
+            df_sup_raw = pd.read_excel(file_supernumerario, sheet_name=target_sheet_sup)
+            
+            if not df_sup_raw.empty and df_sup_raw.shape[1] > 12:
+                # Filtrar en la columna M (índice 12) comparando con el valor del contrato_principal
+                col_m_val = df_sup_raw.iloc[:, 12].astype(str).str.strip().str.upper()
+                contrato_target = str(contrato_principal).strip().upper()
+                
+                df_super_filtrado = df_sup_raw[col_m_val.str.contains(contrato_target, regex=False, na=False)].copy()
+        except Exception as e:
+            st.warning(f"⚠️ No se pudo procesar la BD Supernumerario: {e}")
 
     df_nova = pd.read_excel(file_novasoft, sheet_name=sheet_novasoft) if file_novasoft else pd.DataFrame()
     df_sic = pd.read_excel(file_sic, sheet_name=sheet_sic) if file_sic else pd.DataFrame()
@@ -320,7 +343,7 @@ def procesar_plantilla_geovictoria(
     ws = wb[sheet_entrada]
     ws.views.sheetView[0].showGridLines = True
 
-    # Encabezados de Excel incluyendo BZ: Compensado y CA: Ausentismo Real
+    # Encabezados
     encabezados_estilos = [
         ("AY1", "Fecha Ori", "D0E1F9", "002244", True),
         ("AZ1", "Dia", "D0E1F9", "002244", True),
@@ -350,7 +373,7 @@ def procesar_plantilla_geovictoria(
         ("BX1", "Ausentismo Sic", "00529B", "FFFFFF", True),
         ("BY1", "Ausentismo", "C00000", "FFFFFF", True),
         ("BZ1", "Compensado", "00529B", "FFFFFF", True),
-        ("CA1", "Ausentismo Real", "1E4620", "FFFFFF", True) # Nueva Columna CA
+        ("CA1", "Ausentismo Real", "1E4620", "FFFFFF", True)
     ]
 
     thin_border = Border(
@@ -546,7 +569,7 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BY{i}'] = val_by_consolidado
 
-        # ── BZ: Compensado ──
+        # BZ: Compensado
         val_bz_comp = ""
         if cedula_emp and fecha_ori and pd.notna(fecha_ori):
             key_op = (cedula_emp, fecha_ori.date())
@@ -554,7 +577,7 @@ def procesar_plantilla_geovictoria(
 
         ws[f'BZ{i}'] = val_bz_comp
 
-        # ── CA: Ausentismo Real (Regla: Si BY es Ausencia/Descanso/P y BZ es C -> Asigna C, sino deja BY) ──
+        # CA: Ausentismo Real
         val_ca_aus_real = val_by_consolidado
         if str(val_by_consolidado).strip().lower() in ["ausencia", "descanso", "p"] and str(val_bz_comp).strip().upper() == "C":
             val_ca_aus_real = "C"
@@ -568,6 +591,27 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
+    # ── CREACIÓN DE LA HOJA "Supernumerario" CON EL FILTRADO DE LA BD ──
+    if not df_super_filtrado.empty:
+        if "Supernumerario" in wb.sheetnames:
+            ws_sup = wb["Supernumerario"]
+            ws_sup.delete_rows(1, ws_sup.max_row + 1)
+        else:
+            ws_sup = wb.create_sheet(title="Supernumerario")
+        
+        ws_sup.views.sheetView[0].showGridLines = True
+        
+        # Volcar DataFrame filtrado a la hoja
+        for r_idx, r in enumerate(dataframe_to_rows(df_super_filtrado, index=False, header=True), start=1):
+            ws_sup.append(r)
+            for c_idx in range(1, len(r) + 1):
+                cell = ws_sup.cell(row=r_idx, column=c_idx)
+                cell.border = thin_border
+                if r_idx == 1:
+                    cell.fill = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+
     status_text.empty()
     
     output = io.BytesIO()
@@ -579,7 +623,7 @@ def procesar_plantilla_geovictoria(
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
 st.sidebar.markdown("## ⚙️ Parámetros")
-contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="11CTR21013")
+contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
@@ -594,13 +638,14 @@ with col1:
     file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
     file_operativa = st.file_uploader("2. Base Operativa (.xlsx)", type=["xlsx"])
     file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
+    file_supernumerario = st.file_uploader("7. BD Supernumerario (.xlsx)", type=["xlsx"])
 
     status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
 
     st.markdown(f"""
         <div class="card-container">
             <div class="section-header">
-                <span>📌 Archivos Principales & Operativos (1-3)</span>
+                <span>📌 Archivos Principales & Operativos</span>
                 {status_e}
             </div>
         </div>
@@ -611,13 +656,13 @@ with col2:
     file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
     file_historial = st.file_uploader("6. Historial Laboral (.xlsx)", type=["xlsx"])
 
-    count_comp = sum(1 for x in [file_sic, file_maestro, file_historial] if x is not None)
-    status_c = f'<span class="file-status-ok">✔ {count_comp}/3 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
+    count_comp = sum(1 for x in [file_sic, file_maestro, file_historial, file_supernumerario] if x is not None)
+    status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
 
     st.markdown(f"""
         <div class="card-container">
             <div class="section-header">
-                <span>📊 Bases Complementarias (4-6)</span>
+                <span>📊 Bases Complementarias</span>
                 {status_c}
             </div>
         </div>
@@ -635,6 +680,7 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
         hoja_sic = st.text_input("4. Hoja SIC", value="Datos")
         hoja_maestro = st.text_input("5. Hoja Maestro", value="NOM1911")
         hoja_historial = st.text_input("6. Hoja Historial", value="Hoja 1")
+        hoja_supernumerario = st.text_input("7. Hoja Supernumerario", value="BD Supernumerario")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -645,7 +691,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, cruzando información con Novasoft/SIC y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, filtrando supernumerarios y aplicando estilos..."):
                 excel_salida = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -653,10 +699,11 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     file_sic=file_sic, sheet_sic=hoja_sic,
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
                     file_historial=file_historial, sheet_historial=hoja_historial,
+                    file_supernumerario=file_supernumerario, sheet_supernumerario=hoja_supernumerario,
                     contrato_principal=contrato_principal
                 )
 
-            st.success("✨ ¡Auditoría finalizada con éxito!")
+            st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Supernumerario' creada con el filtro de la Columna M.")
             
             st.download_button(
                 label="📥 Descargar Resultado Calculado (Excel)",
