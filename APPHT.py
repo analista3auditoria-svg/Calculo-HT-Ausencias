@@ -437,7 +437,7 @@ def procesar_plantilla_geovictoria(
     )
 
     fill_ausencia_rojo = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
-    font_ausencia_blanco = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    font_ausencia_blanco = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
 
     for celda_ref, titulo, color_bg, color_fg, es_negrita in encabezados_estilos:
         celda = ws[celda_ref]
@@ -459,6 +459,9 @@ def procesar_plantilla_geovictoria(
 
     conteo_ausencias = 0
     conteo_p = 0
+
+    # Lista para almacenar los registros detallados de ausencias
+    registros_ausencias = []
 
     for idx, row in df_marc.iterrows():
         i = idx + 2
@@ -644,13 +647,24 @@ def procesar_plantilla_geovictoria(
         celda_ca = ws[f'CA{i}']
         celda_ca.value = val_ca_aus_real
 
-        # ── Formato especial con relleno rojo e híper destacado para "Ausencia" ──
+        # Formato de celda y recolección para la nueva Hoja "Ausencias"
         ca_val_clean = str(val_ca_aus_real).strip()
         if ca_val_clean.lower() == "ausencia":
             celda_ca.fill = fill_ausencia_rojo
             celda_ca.font = font_ausencia_blanco
             celda_ca.alignment = Alignment(horizontal="center", vertical="center")
             conteo_ausencias += 1
+
+            # Recolectar datos para la pestaña Ausencias
+            nombre_emp = obtener_val_iloc(row, 1)  # Nombres en Columna B
+            f_str = fecha_ori.strftime('%d/%m/%Y') if fecha_ori and pd.notna(fecha_ori) else str(val_e)
+            registros_ausencias.append({
+                "Identificador": cedula_emp,
+                "Nombres": nombre_emp,
+                "Fecha Ori": f_str,
+                "Dia": dia_nombre,
+                "Ausentismo Real": "Ausencia"
+            })
         elif ca_val_clean.upper() == "P":
             conteo_p += 1
 
@@ -660,6 +674,86 @@ def procesar_plantilla_geovictoria(
         pct = (idx + 1) / total_filas
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
+
+    # ── CREACIÓN DE LA HOJA "Ausencias" ──
+    if "Ausencias" in wb.sheetnames:
+        ws_aus = wb["Ausencias"]
+        ws_aus.delete_rows(1, ws_aus.max_row + 1)
+    else:
+        ws_aus = wb.create_sheet(title="Ausencias")
+    
+    ws_aus.views.sheetView[0].showGridLines = True
+
+    # Estilos para encabezados de la Hoja Ausencias
+    bg_azul_header = PatternFill(start_color="1B5E82", end_color="1B5E82", fill_type="solid")
+    bg_verde_header = PatternFill(start_color="1E4620", end_color="1E4620", fill_type="solid")
+    bg_azul_dark = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
+    font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+    # Encabezados Tabla Izquierda (Detalle A1:E1)
+    ws_aus["A1"] = "Identificador"
+    ws_aus["B1"] = "Nombres"
+    ws_aus["C1"] = "Fecha Ori"
+    ws_aus["D1"] = "Dia"
+    ws_aus["E1"] = "Ausentismo Real"
+
+    for col in ["A1", "B1", "C1", "D1"]:
+        c = ws_aus[col]
+        c.fill = bg_azul_header
+        c.font = font_header
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = thin_border
+
+    c_e1 = ws_aus["E1"]
+    c_e1.fill = bg_verde_header
+    c_e1.font = font_header
+    c_e1.alignment = Alignment(horizontal="center", vertical="center")
+    c_e1.border = thin_border
+
+    # Escribir filas de Ausencias
+    df_aus_det = pd.DataFrame(registros_ausencias)
+    for row_idx, r in enumerate(registros_ausencias, start=2):
+        ws_aus[f"A{row_idx}"] = r["Identificador"]
+        ws_aus[f"B{row_idx}"] = r["Nombres"]
+        ws_aus[f"C{row_idx}"] = r["Fecha Ori"]
+        ws_aus[f"D{row_idx}"] = r["Dia"]
+        
+        c_aus_val = ws_aus[f"E{row_idx}"]
+        c_aus_val.value = r["Ausentismo Real"]
+        c_aus_val.fill = fill_ausencia_rojo
+        c_aus_val.font = font_ausencia_blanco
+        c_aus_val.alignment = Alignment(horizontal="center", vertical="center")
+
+        for col_l in ["A", "B", "C", "D", "E"]:
+            ws_aus[f"{col_l}{row_idx}"].border = thin_border
+
+    # Encabezados Tabla Derecha (Resumen Consolidado H1:I1)
+    ws_aus["H1"] = "Identificador"
+    ws_aus["I1"] = "Cantidad"
+
+    for col in ["H1", "I1"]:
+        c = ws_aus[col]
+        c.fill = bg_azul_dark
+        c.font = font_header
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = thin_border
+
+    # Generar Resumen Consolidado por Identificador
+    if not df_aus_det.empty:
+        df_resumen = df_aus_det.groupby("Identificador").size().reset_index(name="Cantidad")
+        df_resumen = df_resumen.sort_values(by="Cantidad", ascending=False)
+
+        for r_idx, r in enumerate(df_resumen.itertuples(), start=2):
+            c_h = ws_aus[f"H{r_idx}"]
+            c_i = ws_aus[f"I{r_idx}"]
+            
+            c_h.value = r.Identificador
+            c_i.value = r.Cantidad
+            
+            c_h.alignment = Alignment(horizontal="center", vertical="center")
+            c_i.alignment = Alignment(horizontal="right", vertical="center")
+            c_h.border = thin_border
+            c_i.border = thin_border
 
     # Creación de la hoja "Supernumerario"
     if not df_super_filtrado.empty:
@@ -765,7 +859,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, filtrando supernumerarios y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, generando hoja 'Ausencias' y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -788,7 +882,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito!")
+    st.success("✨ ¡Auditoría finalizada con éxito! Pestaña 'Ausencias' creada con su respectivo resumen consolidado.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
