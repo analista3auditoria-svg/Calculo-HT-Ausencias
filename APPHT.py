@@ -10,7 +10,7 @@ import streamlit as st
 # Ocultar advertencias no críticas
 warnings.filterwarnings('ignore', category=UserWarning)
 
-# Configuración de página en Streamlit
+# Configuración de página en Streamlit (Barra lateral siempre desplegada)
 st.set_page_config(
     page_title="Auditor TS - Casalimpia", 
     page_icon="🧼", 
@@ -766,7 +766,6 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal
                 )
 
-            # Guardar en st.session_state para mantener la vista permanente
             st.session_state["procesado_exitoso"] = True
             st.session_state["excel_salida"] = excel_salida
             st.session_state["kpi_ausencias"] = kpi_ausencias
