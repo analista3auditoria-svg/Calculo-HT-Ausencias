@@ -10,7 +10,7 @@ import streamlit as st
 # Ocultar advertencias no críticas
 warnings.filterwarnings('ignore', category=UserWarning)
 
-# Configuración de página en Streamlit (Barra lateral siempre desplegada)
+# Configuración de página en Streamlit
 st.set_page_config(
     page_title="Auditor TS - Casalimpia", 
     page_icon="🧼", 
@@ -27,7 +27,18 @@ st.markdown("""
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        #MainMenu, footer, header {visibility: hidden;}
+        /* Ocultar elementos innecesarios manteniendo la barra lateral visible */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        /* Asegurar que la barra lateral y su botón permancezcan visibles */
+        [data-testid="stSidebar"] {
+            display: block !important;
+            visibility: visible !important;
+        }
+        [data-testid="stSidebarNav"] {
+            display: block !important;
+        }
         
         .main {
             background-color: #f8fafc;
@@ -681,13 +692,14 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
+# Configuración del Panel Lateral (⚙️ Parámetros)
 st.sidebar.markdown("## ⚙️ Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Revisa la etiqueta de estado.<br>3. Ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Revisa las etiquetas de estado.<br>3. Ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
