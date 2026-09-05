@@ -1,5 +1,6 @@
 import os
 import io
+import datetime
 import warnings
 import pandas as pd
 import openpyxl
@@ -461,6 +462,8 @@ def procesar_plantilla_geovictoria(
     conteo_p = 0
     registros_ausencias = []
 
+    hora_corte_nocturna = datetime.time(20, 0)  # 20:00
+
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
@@ -487,31 +490,43 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
+        # Marcaciones: H (col 7), J (col 9), K (col 10), M (col 12)
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
-        horas_validas = []
-        for val_m in [h_val, j_val, k_val, m_val]:
-            h_dt = convertir_a_hora(val_m)
-            if h_dt is not None:
-                horas_validas.append(h_dt)
+        hora_h = convertir_a_hora(h_val)
+        hora_j = convertir_a_hora(j_val)
+        hora_k = convertir_a_hora(k_val)
+        hora_m = convertir_a_hora(m_val)
 
         celda_ba = ws[f'BA{i}']
         celda_bb = ws[f'BB{i}']
 
-        if len(horas_validas) > 0:
-            hora_min = min(horas_validas)
-            celda_ba.value = hora_min
+        # ── CONDICIÓN ESPECIAL TURNO NOCTURNO (ENTRADA K > 20:00) ──
+        if hora_k is not None and hora_k > hora_corte_nocturna:
+            celda_ba.value = hora_k
             celda_ba.number_format = 'hh:mm:ss AM/PM'
-        else:
-            celda_ba.value = ""
 
-        if len(horas_validas) > 1:
-            hora_max = max(horas_validas)
-            celda_bb.value = hora_max
-            celda_bb.number_format = 'hh:mm:ss AM/PM'
+            if hora_j is not None:
+                celda_bb.value = hora_j
+                celda_bb.number_format = 'hh:mm:ss AM/PM'
+            else:
+                celda_bb.value = ""
         else:
-            celda_bb.value = ""
+            # ── CÁLCULO ESTÁNDAR DE ENTRADA2 Y SALIDA2 ──
+            horas_validas = [dt for dt in [hora_h, hora_j, hora_k, hora_m] if dt is not None]
+
+            if len(horas_validas) > 0:
+                celda_ba.value = min(horas_validas)
+                celda_ba.number_format = 'hh:mm:ss AM/PM'
+            else:
+                celda_ba.value = ""
+
+            if len(horas_validas) > 1:
+                celda_bb.value = max(horas_validas)
+                celda_bb.number_format = 'hh:mm:ss AM/PM'
+            else:
+                celda_bb.value = ""
 
         ws[f'BC{i}'].value = f'=IF(OR(BA{i}="",BB{i}=""),"",MOD(BB{i}-BA{i},1))'
         ws[f'BC{i}'].number_format = '[h]:mm'
@@ -858,7 +873,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, calculando Entrada2/Salida2 y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, evaluando turnos nocturnos y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -881,7 +896,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Fórmulas de Entrada2 y Salida2 actualizadas.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Evaluación de turnos nocturnos aplicada.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
