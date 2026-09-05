@@ -292,8 +292,9 @@ def procesar_plantilla_geovictoria(
     contrato_principal,
     fecha_ini_sup, fecha_fin_sup
 ):
-    df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
+    df_marc_raw = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
+    # ── PREPROCESAMIENTO DE BASES COMPLEMENTARIAS ──
     operativa_dict = {}
     if file_operativa:
         try:
@@ -358,7 +359,7 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ Nota: No se pudo cargar la hoja '{sheet_festivos}' ({e}). Se continuará sin marcar festivos.")
 
-    df_marc['Cédula_Str'] = df_marc.apply(lambda r: obtener_val_iloc(r, 2).replace('.0', ''), axis=1)
+    df_marc_raw['Cédula_Str'] = df_marc_raw.apply(lambda r: obtener_val_iloc(r, 2).replace('.0', ''), axis=1)
     
     if not df_hist.empty:
         df_hist['Cédula_Str'] = df_hist.apply(lambda r: obtener_val_iloc(r, 0).replace('.0', ''), axis=1)
@@ -400,6 +401,46 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
+    # ── PASO 1: CONSTRUIR LA ESTRUCTURA CONTINUA DÍA A DÍA POR CADA TRABAJADOR ──
+    df_marc_raw['Fecha_Ori_Dt'] = df_marc_raw.apply(
+        lambda r: pd.to_datetime(str(r.iloc[4])[-10:], dayfirst=True, errors='coerce') if len(str(r.iloc[4])) >= 10 else pd.NaT,
+        axis=1
+    )
+
+    rango_dias = pd.date_range(start=fecha_ini_sup, end=fecha_fin_sup).date if (fecha_ini_sup and fecha_fin_sup) else []
+    
+    # Identificar empleados y sus registros existentes
+    empleados_unicos = df_marc_raw['Cédula_Str'].unique()
+    filas_construidas = []
+
+    for ced in empleados_unicos:
+        if not ced:
+            continue
+        df_emp = df_marc_raw[df_marc_raw['Cédula_Str'] == ced]
+        dict_fechas_emp = {row['Fecha_Ori_Dt'].date(): row for _, row in df_emp.iterrows() if pd.notna(row['Fecha_Ori_Dt'])}
+        row_base = df_emp.iloc[0].to_dict()
+
+        if len(rango_dias) > 0:
+            for f_dia in rango_dias:
+                if f_dia in dict_fechas_emp:
+                    filas_construidas.append(dict_fechas_emp[f_dia].to_dict())
+                else:
+                    # Crear fila faltante garantizando el esquema continuo
+                    new_row = row_base.copy()
+                    new_row['Fecha_Ori_Dt'] = pd.Timestamp(f_dia)
+                    new_row.iloc[4] = f_dia.strftime('%d/%m/%Y')  # Columna E
+                    # Limpiar marcaciones de horario para el día dummy
+                    for c_idx in [7, 9, 10, 12]:
+                        if c_idx < len(new_row):
+                            new_row[df_marc_raw.columns[c_idx]] = None
+                    filas_construidas.append(new_row)
+        else:
+            # Si no hay filtro de fechas, conservar los registros originales
+            filas_construidas.extend(df_emp.to_dict('records'))
+
+    df_marc = pd.DataFrame(filas_construidas)
+
+    # ── PASO 2: APLICAR TODOS LOS CÁLCULOS Y FORMULACIÓN EN LA MISMA HOJA MARCACIONES ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -475,9 +516,15 @@ def procesar_plantilla_geovictoria(
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
+        # Rellenar columnas base en openpyxl si la fila fue construida nuevamente
+        for col_i in range(1, len(row) + 1):
+            ws.cell(row=i, column=col_i, value=row.iloc[col_i - 1])
+
         val_e = obtener_val_iloc(row, 4)
         fecha_ori = None
-        if len(val_e) >= 10:
+        if isinstance(row.get('Fecha_Ori_Dt'), (datetime.date, datetime.datetime, pd.Timestamp)):
+            fecha_ori = pd.to_datetime(row['Fecha_Ori_Dt'])
+        elif len(val_e) >= 10:
             try:
                 fecha_ori = pd.to_datetime(val_e[-10:], dayfirst=True)
             except Exception:
@@ -709,89 +756,7 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
-    # ── CREACIÓN DE HOJA "Marcaciones Filtradas" (RANGO COMPLETO DE FECHAS POR TRABAJADOR) ──
-    if fecha_ini_sup and fecha_fin_sup:
-        nombre_hoja_filtrada = "Marcaciones Filtradas"
-        if nombre_hoja_filtrada in wb.sheetnames:
-            ws_m_filt = wb[nombre_hoja_filtrada]
-            ws_m_filt.delete_rows(1, ws_m_filt.max_row + 1)
-        else:
-            ws_m_filt = wb.create_sheet(title=nombre_hoja_filtrada)
-        
-        ws_m_filt.views.sheetView[0].showGridLines = True
-
-        max_col_m = ws.max_column
-        for col_idx in range(1, max_col_m + 1):
-            source_cell = ws.cell(row=1, column=col_idx)
-            dest_cell = ws_m_filt.cell(row=1, column=col_idx, value=source_cell.value)
-            
-            # Copiar solo valores básicos de visualización para no arrastrar objetos StyleProxy de openpyxl
-            dest_cell.fill = PatternFill(fill_type=None)
-            dest_cell.font = Font(name="Calibri", size=10, bold=True)
-            dest_cell.alignment = Alignment(horizontal="center", vertical="center")
-            dest_cell.border = thin_border
-
-        rango_fechas = pd.date_range(start=fecha_ini_sup, end=fecha_fin_sup).date
-        rango_fechas_set = set(rango_fechas)
-
-        marcaciones_por_emp = {}
-        info_emp_dict = {}
-
-        max_row_m = ws.max_row
-        col_AY_idx = 51  # Columna AY (Fecha Ori)
-
-        for r_idx in range(2, max_row_m + 1):
-            ced_val = str(ws.cell(row=r_idx, column=3).value or '').strip().replace('.0', '')
-            val_ay = ws.cell(row=r_idx, column=col_AY_idx).value
-
-            f_dt = None
-            if isinstance(val_ay, (datetime.date, datetime.datetime)):
-                f_dt = val_ay if isinstance(val_ay, datetime.date) else val_ay.date()
-            elif isinstance(val_ay, str) and len(val_ay) >= 10:
-                try:
-                    f_dt = pd.to_datetime(val_ay[-10:], dayfirst=True).date()
-                except Exception:
-                    pass
-
-            if ced_val:
-                if ced_val not in marcaciones_por_emp:
-                    marcaciones_por_emp[ced_val] = {}
-                    info_emp_dict[ced_val] = [ws.cell(row=r_idx, column=c).value for c in range(1, max_col_m + 1)]
-
-                if f_dt and f_dt in rango_fechas_set:
-                    marcaciones_por_emp[ced_val][f_dt] = r_idx
-
-        idx_dest = 2
-        for ced_val, fechas_dict in marcaciones_por_emp.items():
-            for f_curr in rango_fechas:
-                if f_curr in fechas_dict:
-                    orig_r = fechas_dict[f_curr]
-                    for col_idx in range(1, max_col_m + 1):
-                        c_src = ws.cell(row=orig_r, column=col_idx)
-                        c_dst = ws_m_filt.cell(row=idx_dest, column=col_idx, value=c_src.value)
-                        c_dst.number_format = c_src.number_format
-                        c_dst.border = thin_border
-                else:
-                    base_data = info_emp_dict[ced_val].copy()
-                    for col_idx in range(1, max_col_m + 1):
-                        val_dummy = base_data[col_idx - 1] if col_idx <= len(base_data) else ""
-                        c_dst = ws_m_filt.cell(row=idx_dest, column=col_idx)
-                        c_dst.border = thin_border
-
-                        if col_idx == 51:  # Columna AY (Fecha Ori)
-                            c_dst.value = f_curr
-                            c_dst.number_format = 'DD/MM/YYYY'
-                        elif col_idx == 52:  # Columna AZ (Día)
-                            dia_n = dias_semana_es[f_curr.weekday()]
-                            if f_curr in set_festivos:
-                                dia_n += " Festivo"
-                            c_dst.value = dia_n
-                        else:
-                            c_dst.value = val_dummy
-
-                idx_dest += 1
-
-    # Creación de la hoja "Ausencias"
+    # ── CREACIÓN DE LA HOJA "Ausencias" ──
     if "Ausencias" in wb.sheetnames:
         ws_aus = wb["Ausencias"]
         ws_aus.delete_rows(1, ws_aus.max_row + 1)
@@ -866,7 +831,7 @@ def procesar_plantilla_geovictoria(
             c_h.border = thin_border
             c_i.border = thin_border
 
-    # Creación y cruce de la hoja "Supernumerario"
+    # ── CREACIÓN Y CRUCE DE LA HOJA "Supernumerario" ──
     if not df_super_filtrado.empty:
         if "Supernumerario" in wb.sheetnames:
             ws_sup = wb["Supernumerario"]
@@ -1010,7 +975,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, generando hoja 'Marcaciones Filtradas' y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, garantizando secuencia continua día a día y calculando BA a CA..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1034,7 +999,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Marcaciones Filtradas' creada asegurando la secuencia completa de fechas por trabajador.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Secuencia continua de fechas garantizada y columnas BA a CA calculadas en la hoja Marcaciones.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
