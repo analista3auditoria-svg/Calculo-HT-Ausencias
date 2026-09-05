@@ -487,13 +487,9 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        # Lectura de las 4 columnas de marcaciones: H (col 7), J (col 9), K (col 10), M (col 12)
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
-        # ── NUEVA LÓGICA DE ENTRADA2 Y SALIDA2 SEGÚN FÓRMULAS EXCEL ──
-        # Mínimo de todas las marcas válidas para Entrada2 (BA)
-        # Máximo de todas las marcas válidas para Salida2 (BB) solo si hay más de 1 marca
         horas_validas = []
         for val_m in [h_val, j_val, k_val, m_val]:
             h_dt = convertir_a_hora(val_m)
