@@ -264,7 +264,6 @@ st.markdown("""
 # ─── FUNCIONES DE APOYO Y PROCESAMIENTO ───────────────────────────────────
 
 def obtener_val_iloc(row, index_col):
-    """Soporta objetos de tipo Series y dict de Python"""
     if isinstance(row, dict):
         keys = list(row.keys())
         if len(keys) > index_col:
@@ -518,8 +517,6 @@ def procesar_plantilla_geovictoria(
     registros_ausencias = []
     marcaciones_ht_dict = {}
 
-    hora_corte_nocturna = datetime.time(20, 0)
-
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
@@ -555,43 +552,19 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
-        k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
-
-        hora_h = convertir_a_hora(h_val)
-        hora_j = convertir_a_hora(j_val)
-        hora_k = convertir_a_hora(k_val)
-        hora_m = convertir_a_hora(m_val)
-
+        # ── NATIVO EXCEL: ASIGNACIÓN DE FÓRMULAS DIRECTAS PARA BA Y BB ──
         celda_ba = ws[f'BA{i}']
         celda_bb = ws[f'BB{i}']
 
-        if hora_k is not None and hora_k > hora_corte_nocturna:
-            celda_ba.value = hora_k
-            celda_ba.number_format = 'hh:mm:ss AM/PM'
+        celda_ba.value = f'=SI(Y(H{i}="", J{i}="", K{i}="", M{i}=""), "", IFERROR(MIN(SI(H{i}<>"", VALOR(H{i}), 9999), SI(J{i}<>"", VALOR(J{i}), 9999), SI(K{i}<>"", VALOR(K{i}), 9999), SI(M{i}<>"", VALOR(M{i}), 9999)), ""))'
+        celda_ba.number_format = 'hh:mm:ss AM/PM'
 
-            if hora_j is not None:
-                celda_bb.value = hora_j
-                celda_bb.number_format = 'hh:mm:ss AM/PM'
-            else:
-                celda_bb.value = ""
-        else:
-            horas_validas = [dt for dt in [hora_h, hora_j, hora_k, hora_m] if dt is not None]
+        celda_bb.value = f'=SI(Y(H{i}="", J{i}="", K{i}="", M{i}=""), "", SI((SI(H{i}<>"",1,0)+SI(J{i}<>"",1,0)+SI(K{i}<>"",1,0)+SI(M{i}<>"",1,0))>1, MAX(IFERROR(VALOR(H{i}),0), IFERROR(VALOR(J{i}),0), IFERROR(VALOR(K{i}),0), IFERROR(VALOR(M{i}),0)), ""))'
+        celda_bb.number_format = 'hh:mm:ss AM/PM'
 
-            if len(horas_validas) > 0:
-                celda_ba.value = min(horas_validas)
-                celda_ba.number_format = 'hh:mm:ss AM/PM'
-            else:
-                celda_ba.value = ""
-
-            if len(horas_validas) > 1:
-                celda_bb.value = max(horas_validas)
-                celda_bb.number_format = 'hh:mm:ss AM/PM'
-            else:
-                celda_bb.value = ""
-
-        val_ba = celda_ba.value
-        val_bb = celda_bb.value
+        # Valores auxiliares para lógica Python
+        h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
+        k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
         ws[f'BC{i}'].value = f'=IF(OR(BA{i}="",BB{i}=""),"",MOD(BB{i}-BA{i},1))'
         ws[f'BC{i}'].number_format = '[h]:mm'
@@ -600,12 +573,15 @@ def procesar_plantilla_geovictoria(
         f_val = obtener_val_iloc(row, 5)
         ws[f'BE{i}'] = "C" if f_val == "Descanso compensatorio" else ""
 
-        has_ba = val_ba is not None and val_ba != ""
-        has_bb = val_bb is not None and val_bb != ""
+        has_h = h_val != ""
+        has_j = j_val != ""
+        has_k = k_val != ""
+        has_m = m_val != ""
+        count_marcas = sum([has_h, has_j, has_k, has_m])
 
-        if has_ba and has_bb:
+        if count_marcas >= 2:
             val_bf = ""
-        elif not has_ba and not has_bb:
+        elif count_marcas == 0:
             if dia_nombre.lower() == "domingo" or "festivo" in dia_nombre.lower():
                 val_bf = "Descanso"
             else:
@@ -985,7 +961,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Garantizando secuencia continua día a día y calculando columnas BA a CA en Marcaciones..."):
+            with st.spinner("Procesando marcaciones, garantizando secuencia continua día a día y calculando BA a CA..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1009,7 +985,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Cobertura continua día a día garantizada y columnas BA a CA calculadas en la hoja Marcaciones.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Secuencia continua de fechas garantizada y columnas BA a CA calculadas en la hoja Marcaciones.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
