@@ -462,6 +462,9 @@ def procesar_plantilla_geovictoria(
     conteo_p = 0
     registros_ausencias = []
 
+    # Diccionario para mapear HT de Marcaciones a la hoja Supernumerario: (Cédula, Fecha) -> BD_Formula
+    marcaciones_ht_dict = {}
+
     hora_corte_nocturna = datetime.time(20, 0)
 
     for idx, row in df_marc.iterrows():
@@ -490,7 +493,6 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        # Marcaciones: H (col 7), J (col 9), K (col 10), M (col 12)
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
@@ -502,7 +504,6 @@ def procesar_plantilla_geovictoria(
         celda_ba = ws[f'BA{i}']
         celda_bb = ws[f'BB{i}']
 
-        # ── CÁLCULO DE ENTRADA2 (BA) Y SALIDA2 (BB) ──
         if hora_k is not None and hora_k > hora_corte_nocturna:
             celda_ba.value = hora_k
             celda_ba.number_format = 'hh:mm:ss AM/PM'
@@ -537,7 +538,6 @@ def procesar_plantilla_geovictoria(
         f_val = obtener_val_iloc(row, 5)
         ws[f'BE{i}'] = "C" if f_val == "Descanso compensatorio" else ""
 
-        # ── NUEVAS REGLAS MODIFICADAS PARA LA COLUMNA BF ──
         has_ba = val_ba is not None and val_ba != ""
         has_bb = val_bb is not None and val_bb != ""
 
@@ -675,6 +675,10 @@ def procesar_plantilla_geovictoria(
         celda_ca = ws[f'CA{i}']
         celda_ca.value = val_ca_aus_real
 
+        # Guardar en mapa (Cédula, Fecha) -> Fórmula/Fila de BD para cruce con Supernumerario
+        if cedula_emp and fecha_ori and pd.notna(fecha_ori):
+            marcaciones_ht_dict[(cedula_emp, fecha_ori.date())] = f'=IFERROR(ROUND(BC{i}*24,1),"")'
+
         ca_val_clean = str(val_ca_aus_real).strip()
         if ca_val_clean.lower() == "ausencia":
             celda_ca.fill = fill_ausencia_rojo
@@ -776,7 +780,7 @@ def procesar_plantilla_geovictoria(
             c_h.border = thin_border
             c_i.border = thin_border
 
-    # Creación de la hoja "Supernumerario"
+    # ── CREACIÓN Y CRUCE DE LA HOJA "Supernumerario" (COLUMNA W -> HT) ──
     if not df_super_filtrado.empty:
         if "Supernumerario" in wb.sheetnames:
             ws_sup = wb["Supernumerario"]
@@ -786,6 +790,7 @@ def procesar_plantilla_geovictoria(
         
         ws_sup.views.sheetView[0].showGridLines = True
         
+        # Copiar DataFrame a openpyxl
         for r_idx, r in enumerate(dataframe_to_rows(df_super_filtrado, index=False, header=True), start=1):
             ws_sup.append(r)
             for c_idx in range(1, len(r) + 1):
@@ -795,6 +800,43 @@ def procesar_plantilla_geovictoria(
                     cell.fill = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
                     cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Configurar Columna W1 (Columna 23) -> "HT"
+        ws_sup.cell(row=1, column=23, value="HT")
+        ws_sup.cell(row=1, column=23).fill = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
+        ws_sup.cell(row=1, column=23).font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+        ws_sup.cell(row=1, column=23).alignment = Alignment(horizontal="center", vertical="center")
+
+        # Formatear Columna B (Fecha Corta) y realizar búsqueda de HT
+        max_r_sup = ws_sup.max_row
+        for r_sup in range(2, max_r_sup + 1):
+            cell_f = ws_sup.cell(row=r_sup, column=2)  # Columna B
+            f_val_sup = cell_f.value
+            dt_sup = None
+            
+            if pd.notna(f_val_sup):
+                try:
+                    dt_sup = pd.to_datetime(f_val_sup, dayfirst=True, errors='coerce')
+                    if pd.notna(dt_sup):
+                        cell_f.value = dt_sup.date()
+                        cell_f.number_format = 'DD/MM/YYYY'
+                except Exception:
+                    pass
+
+            cell_ced = ws_sup.cell(row=r_sup, column=3)  # Columna C
+            ced_sup = str(cell_ced.value).strip().replace('.0', '') if cell_ced.value else ""
+
+            # Buscar horas BD en Marcaciones
+            cell_ht = ws_sup.cell(row=r_sup, column=23)  # Columna W
+            cell_ht.border = thin_border
+            cell_ht.alignment = Alignment(horizontal="center", vertical="center")
+
+            if ced_sup and dt_sup and pd.notna(dt_sup):
+                key_sup = (ced_sup, dt_sup.date())
+                ht_encontrado = marcaciones_ht_dict.get(key_sup, "")
+                cell_ht.value = ht_encontrado
+            else:
+                cell_ht.value = ""
 
     status_text.empty()
     
@@ -880,7 +922,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, evaluando columna BF y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, cruzando HT con Supernumerario y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -903,7 +945,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Reglas de Columna BF actualizadas.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Columna HT calculada en la hoja Supernumerario.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
