@@ -462,7 +462,7 @@ def procesar_plantilla_geovictoria(
     conteo_p = 0
     registros_ausencias = []
 
-    hora_corte_nocturna = datetime.time(20, 0)  # 20:00
+    hora_corte_nocturna = datetime.time(20, 0)
 
     for idx, row in df_marc.iterrows():
         i = idx + 2
@@ -502,7 +502,7 @@ def procesar_plantilla_geovictoria(
         celda_ba = ws[f'BA{i}']
         celda_bb = ws[f'BB{i}']
 
-        # ── CONDICIÓN ESPECIAL TURNO NOCTURNO (ENTRADA K > 20:00) ──
+        # ── CÁLCULO DE ENTRADA2 (BA) Y SALIDA2 (BB) ──
         if hora_k is not None and hora_k > hora_corte_nocturna:
             celda_ba.value = hora_k
             celda_ba.number_format = 'hh:mm:ss AM/PM'
@@ -513,7 +513,6 @@ def procesar_plantilla_geovictoria(
             else:
                 celda_bb.value = ""
         else:
-            # ── CÁLCULO ESTÁNDAR DE ENTRADA2 Y SALIDA2 ──
             horas_validas = [dt for dt in [hora_h, hora_j, hora_k, hora_m] if dt is not None]
 
             if len(horas_validas) > 0:
@@ -528,6 +527,9 @@ def procesar_plantilla_geovictoria(
             else:
                 celda_bb.value = ""
 
+        val_ba = celda_ba.value
+        val_bb = celda_bb.value
+
         ws[f'BC{i}'].value = f'=IF(OR(BA{i}="",BB{i}=""),"",MOD(BB{i}-BA{i},1))'
         ws[f'BC{i}'].number_format = '[h]:mm'
         ws[f'BD{i}'] = f'=IFERROR(ROUND(BC{i}*24,1),"")'
@@ -535,12 +537,17 @@ def procesar_plantilla_geovictoria(
         f_val = obtener_val_iloc(row, 5)
         ws[f'BE{i}'] = "C" if f_val == "Descanso compensatorio" else ""
 
-        if h_val != "" and m_val != "":
+        # ── NUEVAS REGLAS MODIFICADAS PARA LA COLUMNA BF ──
+        has_ba = val_ba is not None and val_ba != ""
+        has_bb = val_bb is not None and val_bb != ""
+
+        if has_ba and has_bb:
             val_bf = ""
-        elif dia_nombre.lower() == "domingo" or "festivo" in dia_nombre.lower():
-            val_bf = "Descanso"
-        elif (h_val + j_val + k_val + m_val).strip() == "":
-            val_bf = "Ausencia"
+        elif not has_ba and not has_bb:
+            if dia_nombre.lower() == "domingo" or "festivo" in dia_nombre.lower():
+                val_bf = "Descanso"
+            else:
+                val_bf = "Ausencia"
         else:
             val_bf = "P"
 
@@ -873,7 +880,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, evaluando turnos nocturnos y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, evaluando columna BF y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -896,7 +903,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Evaluación de turnos nocturnos aplicada.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Reglas de Columna BF actualizadas.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
