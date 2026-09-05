@@ -459,8 +459,6 @@ def procesar_plantilla_geovictoria(
 
     conteo_ausencias = 0
     conteo_p = 0
-
-    # Lista para almacenar los registros detallados de ausencias
     registros_ausencias = []
 
     for idx, row in df_marc.iterrows():
@@ -489,20 +487,32 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
+        # Lectura de las 4 columnas de marcaciones: H (col 7), J (col 9), K (col 10), M (col 12)
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
-        celda_ba, celda_bb = ws[f'BA{i}'], ws[f'BB{i}']
-        hora_h, hora_m = convertir_a_hora(h_val), convertir_a_hora(m_val)
+        # ── NUEVA LÓGICA DE ENTRADA2 Y SALIDA2 SEGÚN FÓRMULAS EXCEL ──
+        # Mínimo de todas las marcas válidas para Entrada2 (BA)
+        # Máximo de todas las marcas válidas para Salida2 (BB) solo si hay más de 1 marca
+        horas_validas = []
+        for val_m in [h_val, j_val, k_val, m_val]:
+            h_dt = convertir_a_hora(val_m)
+            if h_dt is not None:
+                horas_validas.append(h_dt)
 
-        if hora_h:
-            celda_ba.value = hora_h
+        celda_ba = ws[f'BA{i}']
+        celda_bb = ws[f'BB{i}']
+
+        if len(horas_validas) > 0:
+            hora_min = min(horas_validas)
+            celda_ba.value = hora_min
             celda_ba.number_format = 'hh:mm:ss AM/PM'
         else:
             celda_ba.value = ""
 
-        if hora_m:
-            celda_bb.value = hora_m
+        if len(horas_validas) > 1:
+            hora_max = max(horas_validas)
+            celda_bb.value = hora_max
             celda_bb.number_format = 'hh:mm:ss AM/PM'
         else:
             celda_bb.value = ""
@@ -647,7 +657,6 @@ def procesar_plantilla_geovictoria(
         celda_ca = ws[f'CA{i}']
         celda_ca.value = val_ca_aus_real
 
-        # Formato de celda y recolección para la nueva Hoja "Ausencias"
         ca_val_clean = str(val_ca_aus_real).strip()
         if ca_val_clean.lower() == "ausencia":
             celda_ca.fill = fill_ausencia_rojo
@@ -655,8 +664,7 @@ def procesar_plantilla_geovictoria(
             celda_ca.alignment = Alignment(horizontal="center", vertical="center")
             conteo_ausencias += 1
 
-            # Recolectar datos para la pestaña Ausencias
-            nombre_emp = obtener_val_iloc(row, 1)  # Nombres en Columna B
+            nombre_emp = obtener_val_iloc(row, 1)
             f_str = fecha_ori.strftime('%d/%m/%Y') if fecha_ori and pd.notna(fecha_ori) else str(val_e)
             registros_ausencias.append({
                 "Identificador": cedula_emp,
@@ -675,7 +683,7 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
-    # ── CREACIÓN DE LA HOJA "Ausencias" ──
+    # Creación de la hoja "Ausencias"
     if "Ausencias" in wb.sheetnames:
         ws_aus = wb["Ausencias"]
         ws_aus.delete_rows(1, ws_aus.max_row + 1)
@@ -684,13 +692,11 @@ def procesar_plantilla_geovictoria(
     
     ws_aus.views.sheetView[0].showGridLines = True
 
-    # Estilos para encabezados de la Hoja Ausencias
     bg_azul_header = PatternFill(start_color="1B5E82", end_color="1B5E82", fill_type="solid")
     bg_verde_header = PatternFill(start_color="1E4620", end_color="1E4620", fill_type="solid")
     bg_azul_dark = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
     font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
 
-    # Encabezados Tabla Izquierda (Detalle A1:E1)
     ws_aus["A1"] = "Identificador"
     ws_aus["B1"] = "Nombres"
     ws_aus["C1"] = "Fecha Ori"
@@ -710,7 +716,6 @@ def procesar_plantilla_geovictoria(
     c_e1.alignment = Alignment(horizontal="center", vertical="center")
     c_e1.border = thin_border
 
-    # Escribir filas de Ausencias
     df_aus_det = pd.DataFrame(registros_ausencias)
     for row_idx, r in enumerate(registros_ausencias, start=2):
         ws_aus[f"A{row_idx}"] = r["Identificador"]
@@ -727,7 +732,6 @@ def procesar_plantilla_geovictoria(
         for col_l in ["A", "B", "C", "D", "E"]:
             ws_aus[f"{col_l}{row_idx}"].border = thin_border
 
-    # Encabezados Tabla Derecha (Resumen Consolidado H1:I1)
     ws_aus["H1"] = "Identificador"
     ws_aus["I1"] = "Cantidad"
 
@@ -738,7 +742,6 @@ def procesar_plantilla_geovictoria(
         c.alignment = Alignment(horizontal="center", vertical="center")
         c.border = thin_border
 
-    # Generar Resumen Consolidado por Identificador
     if not df_aus_det.empty:
         df_resumen = df_aus_det.groupby("Identificador").size().reset_index(name="Cantidad")
         df_resumen = df_resumen.sort_values(by="Cantidad", ascending=False)
@@ -859,7 +862,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, generando hoja 'Ausencias' y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, calculando Entrada2/Salida2 y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -882,7 +885,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Pestaña 'Ausencias' creada con su respectivo resumen consolidado.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Fórmulas de Entrada2 y Salida2 actualizadas.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
