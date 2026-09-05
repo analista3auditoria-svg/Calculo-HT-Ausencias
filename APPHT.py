@@ -709,7 +709,7 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
-    # ── CREACIÓN DE HOJA "Marcaciones Filtradas" (RANGO COMPLETO DE FECHAS) ──
+    # ── CREACIÓN DE HOJA "Marcaciones Filtradas" (RANGO COMPLETO DE FECHAS POR TRABAJADOR) ──
     if fecha_ini_sup and fecha_fin_sup:
         nombre_hoja_filtrada = "Marcaciones Filtradas"
         if nombre_hoja_filtrada in wb.sheetnames:
@@ -720,7 +720,6 @@ def procesar_plantilla_geovictoria(
         
         ws_m_filt.views.sheetView[0].showGridLines = True
 
-        # Copiar encabezados de Marcaciones
         max_col_m = ws.max_column
         for col_idx in range(1, max_col_m + 1):
             source_cell = ws.cell(row=1, column=col_idx)
@@ -733,17 +732,18 @@ def procesar_plantilla_geovictoria(
                 dest_cell.alignment = source_cell.alignment
             dest_cell.border = thin_border
 
-        # Rango de fechas deseado
         rango_fechas = pd.date_range(start=fecha_ini_sup, end=fecha_fin_sup).date
         rango_fechas_set = set(rango_fechas)
 
-        # Agrupar las filas existentes en Marcaciones por Cédula -> {Fecha: Fila_OpenPyXL}
         marcaciones_por_emp = {}
         info_emp_dict = {}
 
-        for r_idx in range(2, max_row_m := ws.max_row + 1):
+        max_row_m = ws.max_row
+        col_AY_idx = 51  # Columna AY
+
+        for r_idx in range(2, max_row_m + 1):
             ced_val = str(ws.cell(row=r_idx, column=3).value or '').strip().replace('.0', '')
-            val_ay = ws.cell(row=r_idx, column=OpenPyXL_col_AY := 51).value  # Columna AY
+            val_ay = ws.cell(row=r_idx, column=col_AY_idx).value
 
             f_dt = None
             if isinstance(val_ay, (datetime.date, datetime.datetime)):
@@ -757,18 +757,15 @@ def procesar_plantilla_geovictoria(
             if ced_val:
                 if ced_val not in marcaciones_por_emp:
                     marcaciones_por_emp[ced_val] = {}
-                    # Guardar info básica del empleado (Nombre, etc.)
                     info_emp_dict[ced_val] = [ws.cell(row=r_idx, column=c).value for c in range(1, max_col_m + 1)]
 
                 if f_dt and f_dt in rango_fechas_set:
                     marcaciones_por_emp[ced_val][f_dt] = r_idx
 
-        # Copiar/Construir filas en Marcaciones Filtradas garantizando que cada trabajador tenga todas las fechas
         idx_dest = 2
         for ced_val, fechas_dict in marcaciones_por_emp.items():
             for f_curr in rango_fechas:
                 if f_curr in fechas_dict:
-                    # Copiar fila exacta con valores y formatos
                     orig_r = fechas_dict[f_curr]
                     for col_idx in range(1, max_col_m + 1):
                         c_src = ws.cell(row=orig_r, column=col_idx)
@@ -780,19 +777,16 @@ def procesar_plantilla_geovictoria(
                             c_dst.font = c_src.font
                         c_dst.border = thin_border
                 else:
-                    # Construir fila dummy para la fecha faltante con los datos base del empleado
                     base_data = info_emp_dict[ced_val].copy()
                     for col_idx in range(1, max_col_m + 1):
                         val_dummy = base_data[col_idx - 1] if col_idx <= len(base_data) else ""
                         c_dst = ws_m_filt.cell(row=idx_dest, column=col_idx)
                         c_dst.border = thin_border
 
-                        # Ajustar Columna AY (Fecha Ori)
-                        if col_idx == 51:
+                        if col_idx == 51:  # Columna AY (Fecha Ori)
                             c_dst.value = f_curr
                             c_dst.number_format = 'DD/MM/YYYY'
-                        # Ajustar Columna AZ (Día)
-                        elif col_idx == 52:
+                        elif col_idx == 52:  # Columna AZ (Día)
                             dia_n = dias_semana_es[f_curr.weekday()]
                             if f_curr in set_festivos:
                                 dia_n += " Festivo"
@@ -941,6 +935,7 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
+# Configuración del Panel Lateral
 st.sidebar.markdown("## ⚙️ Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
 
@@ -1044,7 +1039,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Marcaciones Filtradas' creada asegurando el rango completo de fechas por trabajador.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Marcaciones Filtradas' creada asegurando la secuencia completa de fechas por trabajador.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
