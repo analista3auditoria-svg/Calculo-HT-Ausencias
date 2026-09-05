@@ -264,8 +264,17 @@ st.markdown("""
 # ─── FUNCIONES DE APOYO Y PROCESAMIENTO ───────────────────────────────────
 
 def obtener_val_iloc(row, index_col):
-    if len(row) > index_col and pd.notna(row.iloc[index_col]):
-        return str(row.iloc[index_col]).strip()
+    """Soporta objetos de tipo Series y dict de Python"""
+    if isinstance(row, dict):
+        keys = list(row.keys())
+        if len(keys) > index_col:
+            val = row[keys[index_col]]
+            return str(val).strip() if pd.notna(val) else ""
+        return ""
+    
+    if hasattr(row, 'iloc') and len(row) > index_col:
+        val = row.iloc[index_col]
+        return str(val).strip() if pd.notna(val) else ""
     return ""
 
 def convertir_a_hora(val):
@@ -409,7 +418,6 @@ def procesar_plantilla_geovictoria(
 
     rango_dias = pd.date_range(start=fecha_ini_sup, end=fecha_fin_sup).date if (fecha_ini_sup and fecha_fin_sup) else []
     
-    # Identificar empleados y sus registros existentes
     empleados_unicos = df_marc_raw['Cédula_Str'].unique()
     filas_construidas = []
 
@@ -417,25 +425,24 @@ def procesar_plantilla_geovictoria(
         if not ced:
             continue
         df_emp = df_marc_raw[df_marc_raw['Cédula_Str'] == ced]
-        dict_fechas_emp = {row['Fecha_Ori_Dt'].date(): row for _, row in df_emp.iterrows() if pd.notna(row['Fecha_Ori_Dt'])}
+        dict_fechas_emp = {row['Fecha_Ori_Dt'].date(): row.to_dict() for _, row in df_emp.iterrows() if pd.notna(row['Fecha_Ori_Dt'])}
         row_base = df_emp.iloc[0].to_dict()
 
         if len(rango_dias) > 0:
             for f_dia in rango_dias:
                 if f_dia in dict_fechas_emp:
-                    filas_construidas.append(dict_fechas_emp[f_dia].to_dict())
+                    filas_construidas.append(dict_fechas_emp[f_dia])
                 else:
-                    # Crear fila faltante garantizando el esquema continuo
                     new_row = row_base.copy()
                     new_row['Fecha_Ori_Dt'] = pd.Timestamp(f_dia)
-                    new_row.iloc[4] = f_dia.strftime('%d/%m/%Y')  # Columna E
-                    # Limpiar marcaciones de horario para el día dummy
+                    cols_keys = list(df_marc_raw.columns)
+                    if len(cols_keys) > 4:
+                        new_row[cols_keys[4]] = f_dia.strftime('%d/%m/%Y')
                     for c_idx in [7, 9, 10, 12]:
-                        if c_idx < len(new_row):
-                            new_row[df_marc_raw.columns[c_idx]] = None
+                        if c_idx < len(cols_keys):
+                            new_row[cols_keys[c_idx]] = None
                     filas_construidas.append(new_row)
         else:
-            # Si no hay filtro de fechas, conservar los registros originales
             filas_construidas.extend(df_emp.to_dict('records'))
 
     df_marc = pd.DataFrame(filas_construidas)
@@ -516,9 +523,12 @@ def procesar_plantilla_geovictoria(
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
-        # Rellenar columnas base en openpyxl si la fila fue construida nuevamente
-        for col_i in range(1, len(row) + 1):
-            ws.cell(row=i, column=col_i, value=row.iloc[col_i - 1])
+        # Re-escribir columnas base en openpyxl
+        cols_df = list(df_marc.columns)
+        for col_i, col_name in enumerate(cols_df, start=1):
+            val_col = row[col_name]
+            if pd.notna(val_col) and str(col_name) != 'Fecha_Ori_Dt':
+                ws.cell(row=i, column=col_i, value=val_col)
 
         val_e = obtener_val_iloc(row, 4)
         fecha_ori = None
@@ -614,7 +624,7 @@ def procesar_plantilla_geovictoria(
         ws[f'BM{i}'] = f'=W{i}'
         ws[f'BN{i}'] = f'=AA{i}+AE{i}'
 
-        cedula_emp = row['Cédula_Str']
+        cedula_emp = obtener_val_iloc(row, 2).replace('.0', '')
         val_bo = ""
         if cedula_emp in hist_dict and fecha_ori and pd.notna(fecha_ori):
             sub_hist = hist_dict[cedula_emp]
@@ -975,7 +985,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, garantizando secuencia continua día a día y calculando BA a CA..."):
+            with st.spinner("Garantizando secuencia continua día a día y calculando columnas BA a CA en Marcaciones..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -999,7 +1009,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Secuencia continua de fechas garantizada y columnas BA a CA calculadas en la hoja Marcaciones.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Cobertura continua día a día garantizada y columnas BA a CA calculadas en la hoja Marcaciones.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
