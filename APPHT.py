@@ -289,7 +289,8 @@ def procesar_plantilla_geovictoria(
     file_maestro, sheet_maestro,
     file_historial, sheet_historial,
     file_supernumerario, sheet_supernumerario,
-    contrato_principal
+    contrato_principal,
+    fecha_ini_sup, fecha_fin_sup
 ):
     df_marc = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
@@ -318,6 +319,7 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
 
+    # ── FILTRADO DE BD SUPERNUMERARIO POR CONTRATO Y RANGO DE FECHAS ──
     df_super_filtrado = pd.DataFrame()
     if file_supernumerario:
         try:
@@ -330,9 +332,17 @@ def procesar_plantilla_geovictoria(
             df_sup_raw = pd.read_excel(file_supernumerario, sheet_name=target_sheet_sup)
             
             if not df_sup_raw.empty and df_sup_raw.shape[1] > 12:
+                # Criterio 1: Filtro por Contrato (Columna M - Índice 12)
                 col_m_val = df_sup_raw.iloc[:, 12].astype(str).str.strip().str.upper()
                 contrato_target = str(contrato_principal).strip().upper()
-                df_super_filtrado = df_sup_raw[col_m_val.str.contains(contrato_target, regex=False, na=False)].copy()
+                mask = col_m_val.str.contains(contrato_target, regex=False, na=False)
+
+                # Criterio 2: Filtro por Rango de Fechas (Columna B - Índice 1)
+                if fecha_ini_sup and fecha_fin_sup:
+                    fechas_col_b = pd.to_datetime(df_sup_raw.iloc[:, 1], dayfirst=True, errors='coerce').dt.date
+                    mask = mask & (fechas_col_b >= fecha_ini_sup) & (fechas_col_b <= fecha_fin_sup)
+
+                df_super_filtrado = df_sup_raw[mask].copy()
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la BD Supernumerario (hoja '{sheet_supernumerario}'): {e}")
 
@@ -461,8 +471,6 @@ def procesar_plantilla_geovictoria(
     conteo_ausencias = 0
     conteo_p = 0
     registros_ausencias = []
-
-    # Diccionario para mapear HT de Marcaciones a la hoja Supernumerario: (Cédula, Fecha) -> BD_Formula
     marcaciones_ht_dict = {}
 
     hora_corte_nocturna = datetime.time(20, 0)
@@ -675,7 +683,6 @@ def procesar_plantilla_geovictoria(
         celda_ca = ws[f'CA{i}']
         celda_ca.value = val_ca_aus_real
 
-        # Guardar en mapa (Cédula, Fecha) -> Fórmula/Fila de BD para cruce con Supernumerario
         if cedula_emp and fecha_ori and pd.notna(fecha_ori):
             marcaciones_ht_dict[(cedula_emp, fecha_ori.date())] = f'=IFERROR(ROUND(BC{i}*24,1),"")'
 
@@ -780,7 +787,7 @@ def procesar_plantilla_geovictoria(
             c_h.border = thin_border
             c_i.border = thin_border
 
-    # ── CREACIÓN Y CRUCE DE LA HOJA "Supernumerario" (COLUMNA W -> HT) ──
+    # Creación y cruce de la hoja "Supernumerario"
     if not df_super_filtrado.empty:
         if "Supernumerario" in wb.sheetnames:
             ws_sup = wb["Supernumerario"]
@@ -790,7 +797,6 @@ def procesar_plantilla_geovictoria(
         
         ws_sup.views.sheetView[0].showGridLines = True
         
-        # Copiar DataFrame a openpyxl
         for r_idx, r in enumerate(dataframe_to_rows(df_super_filtrado, index=False, header=True), start=1):
             ws_sup.append(r)
             for c_idx in range(1, len(r) + 1):
@@ -801,16 +807,14 @@ def procesar_plantilla_geovictoria(
                     cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
                     cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Configurar Columna W1 (Columna 23) -> "HT"
         ws_sup.cell(row=1, column=23, value="HT")
         ws_sup.cell(row=1, column=23).fill = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
         ws_sup.cell(row=1, column=23).font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
         ws_sup.cell(row=1, column=23).alignment = Alignment(horizontal="center", vertical="center")
 
-        # Formatear Columna B (Fecha Corta) y realizar búsqueda de HT
         max_r_sup = ws_sup.max_row
         for r_sup in range(2, max_r_sup + 1):
-            cell_f = ws_sup.cell(row=r_sup, column=2)  # Columna B
+            cell_f = ws_sup.cell(row=r_sup, column=2)
             f_val_sup = cell_f.value
             dt_sup = None
             
@@ -823,11 +827,10 @@ def procesar_plantilla_geovictoria(
                 except Exception:
                     pass
 
-            cell_ced = ws_sup.cell(row=r_sup, column=3)  # Columna C
+            cell_ced = ws_sup.cell(row=r_sup, column=3)
             ced_sup = str(cell_ced.value).strip().replace('.0', '') if cell_ced.value else ""
 
-            # Buscar horas BD en Marcaciones
-            cell_ht = ws_sup.cell(row=r_sup, column=23)  # Columna W
+            cell_ht = ws_sup.cell(row=r_sup, column=23)
             cell_ht.border = thin_border
             cell_ht.alignment = Alignment(horizontal="center", vertical="center")
 
@@ -851,11 +854,17 @@ def procesar_plantilla_geovictoria(
 # Configuración del Panel Lateral
 st.sidebar.markdown("## ⚙️ Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📅 Filtro BD Supernumerario")
+fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 2, 1))
+fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 2, 28))
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Revisa las etiquetas de estado.<br>3. Ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Ajusta las fechas del Supernumerario.<br>3. Ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -922,7 +931,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando Información..."):
+            with st.spinner("Procesando marcaciones, filtrando BD Supernumerario por fecha y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -931,7 +940,8 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
                     file_historial=file_historial, sheet_historial=hoja_historial,
                     file_supernumerario=file_supernumerario, sheet_supernumerario=hoja_supernumerario,
-                    contrato_principal=contrato_principal
+                    contrato_principal=contrato_principal,
+                    fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup
                 )
 
             st.session_state["procesado_exitoso"] = True
@@ -945,7 +955,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito!.")
+    st.success("✨ ¡Auditoría finalizada con éxito! BD Supernumerario filtrada por el rango de fechas seleccionado.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
