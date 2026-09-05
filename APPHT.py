@@ -724,12 +724,11 @@ def procesar_plantilla_geovictoria(
         for col_idx in range(1, max_col_m + 1):
             source_cell = ws.cell(row=1, column=col_idx)
             dest_cell = ws_m_filt.cell(row=1, column=col_idx, value=source_cell.value)
-            if source_cell.fill:
-                dest_cell.fill = source_cell.fill
-            if source_cell.font:
-                dest_cell.font = source_cell.font
-            if source_cell.alignment:
-                dest_cell.alignment = source_cell.alignment
+            
+            # Copiar solo valores básicos de visualización para no arrastrar objetos StyleProxy de openpyxl
+            dest_cell.fill = PatternFill(fill_type=None)
+            dest_cell.font = Font(name="Calibri", size=10, bold=True)
+            dest_cell.alignment = Alignment(horizontal="center", vertical="center")
             dest_cell.border = thin_border
 
         rango_fechas = pd.date_range(start=fecha_ini_sup, end=fecha_fin_sup).date
@@ -739,7 +738,7 @@ def procesar_plantilla_geovictoria(
         info_emp_dict = {}
 
         max_row_m = ws.max_row
-        col_AY_idx = 51  # Columna AY
+        col_AY_idx = 51  # Columna AY (Fecha Ori)
 
         for r_idx in range(2, max_row_m + 1):
             ced_val = str(ws.cell(row=r_idx, column=3).value or '').strip().replace('.0', '')
@@ -771,10 +770,6 @@ def procesar_plantilla_geovictoria(
                         c_src = ws.cell(row=orig_r, column=col_idx)
                         c_dst = ws_m_filt.cell(row=idx_dest, column=col_idx, value=c_src.value)
                         c_dst.number_format = c_src.number_format
-                        if c_src.fill:
-                            c_dst.fill = c_src.fill
-                        if c_src.font:
-                            c_dst.font = c_src.font
                         c_dst.border = thin_border
                 else:
                     base_data = info_emp_dict[ced_val].copy()
