@@ -319,7 +319,6 @@ def procesar_plantilla_geovictoria(
         except Exception as e:
             st.warning(f"⚠️ No se pudo procesar la hoja '{sheet_operativa}' de la Base Operativa: {e}")
 
-    # ── FILTRADO DE BD SUPERNUMERARIO POR CONTRATO Y RANGO DE FECHAS ──
     df_super_filtrado = pd.DataFrame()
     if file_supernumerario:
         try:
@@ -332,12 +331,10 @@ def procesar_plantilla_geovictoria(
             df_sup_raw = pd.read_excel(file_supernumerario, sheet_name=target_sheet_sup)
             
             if not df_sup_raw.empty and df_sup_raw.shape[1] > 12:
-                # Criterio 1: Filtro por Contrato (Columna M - Índice 12)
                 col_m_val = df_sup_raw.iloc[:, 12].astype(str).str.strip().str.upper()
                 contrato_target = str(contrato_principal).strip().upper()
                 mask = col_m_val.str.contains(contrato_target, regex=False, na=False)
 
-                # Criterio 2: Filtro por Rango de Fechas (Columna B - Índice 1)
                 if fecha_ini_sup and fecha_fin_sup:
                     fechas_col_b = pd.to_datetime(df_sup_raw.iloc[:, 1], dayfirst=True, errors='coerce').dt.date
                     mask = mask & (fechas_col_b >= fecha_ini_sup) & (fechas_col_b <= fecha_fin_sup)
@@ -712,6 +709,99 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
+    # ── CREACIÓN DE HOJA "Marcaciones Filtradas" (RANGO COMPLETO DE FECHAS) ──
+    if fecha_ini_sup and fecha_fin_sup:
+        nombre_hoja_filtrada = "Marcaciones Filtradas"
+        if nombre_hoja_filtrada in wb.sheetnames:
+            ws_m_filt = wb[nombre_hoja_filtrada]
+            ws_m_filt.delete_rows(1, ws_m_filt.max_row + 1)
+        else:
+            ws_m_filt = wb.create_sheet(title=nombre_hoja_filtrada)
+        
+        ws_m_filt.views.sheetView[0].showGridLines = True
+
+        # Copiar encabezados de Marcaciones
+        max_col_m = ws.max_column
+        for col_idx in range(1, max_col_m + 1):
+            source_cell = ws.cell(row=1, column=col_idx)
+            dest_cell = ws_m_filt.cell(row=1, column=col_idx, value=source_cell.value)
+            if source_cell.fill:
+                dest_cell.fill = source_cell.fill
+            if source_cell.font:
+                dest_cell.font = source_cell.font
+            if source_cell.alignment:
+                dest_cell.alignment = source_cell.alignment
+            dest_cell.border = thin_border
+
+        # Rango de fechas deseado
+        rango_fechas = pd.date_range(start=fecha_ini_sup, end=fecha_fin_sup).date
+        rango_fechas_set = set(rango_fechas)
+
+        # Agrupar las filas existentes en Marcaciones por Cédula -> {Fecha: Fila_OpenPyXL}
+        marcaciones_por_emp = {}
+        info_emp_dict = {}
+
+        for r_idx in range(2, max_row_m := ws.max_row + 1):
+            ced_val = str(ws.cell(row=r_idx, column=3).value or '').strip().replace('.0', '')
+            val_ay = ws.cell(row=r_idx, column=OpenPyXL_col_AY := 51).value  # Columna AY
+
+            f_dt = None
+            if isinstance(val_ay, (datetime.date, datetime.datetime)):
+                f_dt = val_ay if isinstance(val_ay, datetime.date) else val_ay.date()
+            elif isinstance(val_ay, str) and len(val_ay) >= 10:
+                try:
+                    f_dt = pd.to_datetime(val_ay[-10:], dayfirst=True).date()
+                except Exception:
+                    pass
+
+            if ced_val:
+                if ced_val not in marcaciones_por_emp:
+                    marcaciones_por_emp[ced_val] = {}
+                    # Guardar info básica del empleado (Nombre, etc.)
+                    info_emp_dict[ced_val] = [ws.cell(row=r_idx, column=c).value for c in range(1, max_col_m + 1)]
+
+                if f_dt and f_dt in rango_fechas_set:
+                    marcaciones_por_emp[ced_val][f_dt] = r_idx
+
+        # Copiar/Construir filas en Marcaciones Filtradas garantizando que cada trabajador tenga todas las fechas
+        idx_dest = 2
+        for ced_val, fechas_dict in marcaciones_por_emp.items():
+            for f_curr in rango_fechas:
+                if f_curr in fechas_dict:
+                    # Copiar fila exacta con valores y formatos
+                    orig_r = fechas_dict[f_curr]
+                    for col_idx in range(1, max_col_m + 1):
+                        c_src = ws.cell(row=orig_r, column=col_idx)
+                        c_dst = ws_m_filt.cell(row=idx_dest, column=col_idx, value=c_src.value)
+                        c_dst.number_format = c_src.number_format
+                        if c_src.fill:
+                            c_dst.fill = c_src.fill
+                        if c_src.font:
+                            c_dst.font = c_src.font
+                        c_dst.border = thin_border
+                else:
+                    # Construir fila dummy para la fecha faltante con los datos base del empleado
+                    base_data = info_emp_dict[ced_val].copy()
+                    for col_idx in range(1, max_col_m + 1):
+                        val_dummy = base_data[col_idx - 1] if col_idx <= len(base_data) else ""
+                        c_dst = ws_m_filt.cell(row=idx_dest, column=col_idx)
+                        c_dst.border = thin_border
+
+                        # Ajustar Columna AY (Fecha Ori)
+                        if col_idx == 51:
+                            c_dst.value = f_curr
+                            c_dst.number_format = 'DD/MM/YYYY'
+                        # Ajustar Columna AZ (Día)
+                        elif col_idx == 52:
+                            dia_n = dias_semana_es[f_curr.weekday()]
+                            if f_curr in set_festivos:
+                                dia_n += " Festivo"
+                            c_dst.value = dia_n
+                        else:
+                            c_dst.value = val_dummy
+
+                idx_dest += 1
+
     # Creación de la hoja "Ausencias"
     if "Ausencias" in wb.sheetnames:
         ws_aus = wb["Ausencias"]
@@ -851,12 +941,11 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# Configuración del Panel Lateral
 st.sidebar.markdown("## ⚙️ Parámetros")
 contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📅 Filtro BD Supernumerario")
+st.sidebar.markdown("### 📅 Filtro Rango de Fechas")
 fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 2, 1))
 fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 2, 28))
 
@@ -864,7 +953,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Ajusta las fechas del Supernumerario.<br>3. Ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Ajusta las fechas del periodo.<br>3. Ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -931,7 +1020,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, filtrando BD Supernumerario por fecha y aplicando estilos..."):
+            with st.spinner("Procesando marcaciones, generando hoja 'Marcaciones Filtradas' y aplicando estilos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -955,7 +1044,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! BD Supernumerario filtrada por el rango de fechas seleccionado.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Hoja 'Marcaciones Filtradas' creada asegurando el rango completo de fechas por trabajador.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
