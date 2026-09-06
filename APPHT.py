@@ -446,7 +446,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR TODOS LOS CÁLCULOS Y FORMULACIÓN EN LA MISMA HOJA MARCACIONES ──
+    # ── PASO 2: APLICAR TODOS LOS CÁLCULOS Y VALORES ESTÁTICOS EN HOJA MARCACIONES ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -517,10 +517,11 @@ def procesar_plantilla_geovictoria(
     registros_ausencias = []
     marcaciones_ht_dict = {}
 
+    hora_corte_nocturna = datetime.time(20, 0)
+
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
-        # Re-escribir columnas base en openpyxl
         cols_df = list(df_marc.columns)
         for col_i, col_name in enumerate(cols_df, start=1):
             val_col = row[col_name]
@@ -552,19 +553,45 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        # ── NATIVO EXCEL: ASIGNACIÓN DE FÓRMULAS DIRECTAS PARA BA Y BB ──
+        # ── CÁLCULO DE VALORES ESTÁTICOS SIN INSERCIÓN DE FÓRMULAS TEXTUALES EN EXCEL ──
+        h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
+        k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
+
+        hora_h = convertir_a_hora(h_val)
+        hora_j = convertir_a_hora(j_val)
+        hora_k = convertir_a_hora(k_val)
+        hora_m = convertir_a_hora(m_val)
+
         celda_ba = ws[f'BA{i}']
         celda_bb = ws[f'BB{i}']
 
-        celda_ba.value = f'=SI(Y(H{i}="", J{i}="", K{i}="", M{i}=""), "", IFERROR(MIN(SI(H{i}<>"", VALOR(H{i}), 9999), SI(J{i}<>"", VALOR(J{i}), 9999), SI(K{i}<>"", VALOR(K{i}), 9999), SI(M{i}<>"", VALOR(M{i}), 9999)), ""))'
-        celda_ba.number_format = 'hh:mm:ss AM/PM'
+        # Evaluación de Turno Nocturno (Entrada K > 20:00) o Mínimo/Máximo Estándar
+        if hora_k is not None and hora_k > hora_corte_nocturna:
+            celda_ba.value = hora_k
+            celda_ba.number_format = 'hh:mm:ss AM/PM'
 
-        celda_bb.value = f'=SI(Y(H{i}="", J{i}="", K{i}="", M{i}=""), "", SI((SI(H{i}<>"",1,0)+SI(J{i}<>"",1,0)+SI(K{i}<>"",1,0)+SI(M{i}<>"",1,0))>1, MAX(IFERROR(VALOR(H{i}),0), IFERROR(VALOR(J{i}),0), IFERROR(VALOR(K{i}),0), IFERROR(VALOR(M{i}),0)), ""))'
-        celda_bb.number_format = 'hh:mm:ss AM/PM'
+            if hora_j is not None:
+                celda_bb.value = hora_j
+                celda_bb.number_format = 'hh:mm:ss AM/PM'
+            else:
+                celda_bb.value = ""
+        else:
+            horas_validas = [dt for dt in [hora_h, hora_j, hora_k, hora_m] if dt is not None]
 
-        # Valores auxiliares para lógica Python
-        h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
-        k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
+            if len(horas_validas) > 0:
+                celda_ba.value = min(horas_validas)
+                celda_ba.number_format = 'hh:mm:ss AM/PM'
+            else:
+                celda_ba.value = ""
+
+            if len(horas_validas) > 1:
+                celda_bb.value = max(horas_validas)
+                celda_bb.number_format = 'hh:mm:ss AM/PM'
+            else:
+                celda_bb.value = ""
+
+        val_ba = celda_ba.value
+        val_bb = celda_bb.value
 
         ws[f'BC{i}'].value = f'=IF(OR(BA{i}="",BB{i}=""),"",MOD(BB{i}-BA{i},1))'
         ws[f'BC{i}'].number_format = '[h]:mm'
@@ -961,7 +988,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, garantizando secuencia continua día a día y calculando BA a CA..."):
+            with st.spinner("Procesando marcaciones, calculando valores estáticos para BA/BB y eliminando error #¿NOMBRE?..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -985,7 +1012,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Secuencia continua de fechas garantizada y columnas BA a CA calculadas en la hoja Marcaciones.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Valores estáticos calculados para Entrada2 y Salida2 sin errores de fórmula.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
