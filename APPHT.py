@@ -214,6 +214,37 @@ st.markdown("""
             display: none !important;
         }
 
+        /* Cuadro verde con visto de éxito al cargar archivos */
+        [data-testid="stFileUploaderFileData"] > div:first-child,
+        [data-testid="stFileUploaderFileData"] svg,
+        div[data-testid="stFileUploaderFileData"] > span:first-child {
+            background-color: #dcfce7 !important;
+            color: #15803d !important;
+            border-radius: 8px !important;
+            fill: #15803d !important;
+        }
+
+        [data-testid="stFileUploaderFileData"] > div:first-child::after {
+            content: "✓" !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: #dcfce7 !important;
+            color: #15803d !important;
+            font-weight: 800 !important;
+            font-size: 16px !important;
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 8px !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+        }
+
+        [data-testid="stFileUploaderFileData"] svg {
+            display: none !important;
+        }
+
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -277,7 +308,7 @@ def obtener_val_iloc(row, index_col):
     return ""
 
 def convertir_a_hora(val):
-    if not val:
+    if not val or pd.isna(val):
         return None
     try:
         dt = pd.to_datetime(val, format='%H:%M', errors='coerce')
@@ -446,7 +477,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR TODOS LOS CÁLCULOS Y VALORES ESTÁTICOS EN HOJA MARCACIONES ──
+    # ── PASO 2: APLICAR CÁLCULOS NATIVOS Y ESTILOS EN LA HOJA MARCACIONES ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -553,7 +584,7 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        # ── CÁLCULO DE VALORES ESTÁTICOS SIN INSERCIÓN DE FÓRMULAS TEXTUALES EN EXCEL ──
+        # ── CÁLCULO DE VALORES DE TIEMPO EN PYTHON PARA BA Y BB ──
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
