@@ -214,7 +214,6 @@ st.markdown("""
             display: none !important;
         }
 
-        /* Cuadro verde con visto de éxito al cargar archivos */
         [data-testid="stFileUploaderFileData"] > div:first-child,
         [data-testid="stFileUploaderFileData"] svg,
         div[data-testid="stFileUploaderFileData"] > span:first-child {
@@ -440,7 +439,7 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
-    # ── PASO 1: CONSTRUIR LA ESTRUCTURA CONTINUA DÍA A DÍA POR CADA TRABAJADOR ──
+    # ── PASO 1: CONSTRUIR LA ESTRUCTURA DÍA A DÍA SIN MEZCLAR O HEREDAR MARCACIONES ──
     df_marc_raw['Fecha_Ori_Dt'] = df_marc_raw.apply(
         lambda r: pd.to_datetime(str(r.iloc[4])[-10:], dayfirst=True, errors='coerce') if len(str(r.iloc[4])) >= 10 else pd.NaT,
         axis=1
@@ -450,6 +449,8 @@ def procesar_plantilla_geovictoria(
     
     empleados_unicos = df_marc_raw['Cédula_Str'].unique()
     filas_construidas = []
+
+    cols_keys = [c for c in list(df_marc_raw.columns) if c != 'Cédula_Str']
 
     for ced in empleados_unicos:
         if not ced:
@@ -461,13 +462,17 @@ def procesar_plantilla_geovictoria(
         if len(rango_dias) > 0:
             for f_dia in rango_dias:
                 if f_dia in dict_fechas_emp:
+                    # SI LA FECHA EXISTE EN LA BASE CARGADA: Conserva exactamente sus marcaciones reales
                     filas_construidas.append(dict_fechas_emp[f_dia])
                 else:
+                    # SI LA FECHA NO EXISTE EN LA BASE CARGADA: Crea fila nueva con marcaciones VACÍAS
                     new_row = row_base.copy()
                     new_row['Fecha_Ori_Dt'] = pd.Timestamp(f_dia)
-                    cols_keys = list(df_marc_raw.columns)
                     if len(cols_keys) > 4:
                         new_row[cols_keys[4]] = f_dia.strftime('%d/%m/%Y')
+                    
+                    # Vaciar estrictamente todas las columnas de horas de marcaciones
+                    # H (índice 7), J (índice 9), K (índice 10), M (índice 12)
                     for c_idx in [7, 9, 10, 12]:
                         if c_idx < len(cols_keys):
                             new_row[cols_keys[c_idx]] = None
@@ -477,7 +482,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR CÁLCULOS NATIVOS Y ESTILOS EN LA HOJA MARCACIONES ──
+    # ── PASO 2: APLICAR CÁLCULOS VERÍDICOS EN LA HOJA MARCACIONES ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -553,11 +558,12 @@ def procesar_plantilla_geovictoria(
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
+        # Re-escribir columnas base en openpyxl
         cols_df = list(df_marc.columns)
         for col_i, col_name in enumerate(cols_df, start=1):
             val_col = row[col_name]
-            if pd.notna(val_col) and str(col_name) != 'Fecha_Ori_Dt':
-                ws.cell(row=i, column=col_i, value=val_col)
+            if str(col_name) != 'Fecha_Ori_Dt':
+                ws.cell(row=i, column=col_i, value=val_col if pd.notna(val_col) else "")
 
         val_e = obtener_val_iloc(row, 4)
         fecha_ori = None
@@ -1019,7 +1025,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones, calculando valores estáticos para BA/BB y eliminando error #¿NOMBRE?..."):
+            with st.spinner("Procesando marcaciones verídicas y aplicando reglas de negocio..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1043,7 +1049,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Valores estáticos calculados para Entrada2 y Salida2 sin errores de fórmula.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Información procesada de forma verídica para todas las marcaciones.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
