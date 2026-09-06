@@ -418,7 +418,9 @@ def procesar_plantilla_geovictoria(
         df_nova['Concepto'] = df_nova.apply(lambda r: obtener_val_iloc(r, 2), axis=1)
         df_nova['Fecha_Inicio'] = pd.to_datetime(df_nova.iloc[:, 3], dayfirst=True, errors='coerce') if df_nova.shape[1] > 3 else pd.NaT
         df_nova['Fecha_Fin'] = pd.to_datetime(df_nova.iloc[:, 4], dayfirst=True, errors='coerce') if df_nova.shape[1] > 4 else pd.NaT
-        df_nova['Codigo_Novasoft'] = df_nova.apply(lambda r: obtener_val_iloc(r, 9), axis=1)
+        
+        # ── AJUSTE: LEER CÓDIGO NOVASOFT DESDE LA COLUMNA I (ÍNDICE 8) DE BBDD NOVASOFT ──
+        df_nova['Codigo_Novasoft'] = df_nova.apply(lambda r: obtener_val_iloc(r, 8), axis=1)
 
     if not df_sic.empty:
         df_sic['Cédula_Str'] = df_sic.apply(lambda r: obtener_val_iloc(r, 9).replace('.0', ''), axis=1)
@@ -439,7 +441,7 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
-    # ── PASO 1: CONSTRUIR LA ESTRUCTURA DÍA A DÍA SIN MEZCLAR O HEREDAR MARCACIONES ──
+    # ── PASO 1: CONSTRUIR ESTRUCTURA DÍA A DÍA SIN MEZCLAR O HEREDAR MARCACIONES ──
     df_marc_raw['Fecha_Ori_Dt'] = df_marc_raw.apply(
         lambda r: pd.to_datetime(str(r.iloc[4])[-10:], dayfirst=True, errors='coerce') if len(str(r.iloc[4])) >= 10 else pd.NaT,
         axis=1
@@ -462,17 +464,13 @@ def procesar_plantilla_geovictoria(
         if len(rango_dias) > 0:
             for f_dia in rango_dias:
                 if f_dia in dict_fechas_emp:
-                    # SI LA FECHA EXISTE EN LA BASE CARGADA: Conserva exactamente sus marcaciones reales
                     filas_construidas.append(dict_fechas_emp[f_dia])
                 else:
-                    # SI LA FECHA NO EXISTE EN LA BASE CARGADA: Crea fila nueva con marcaciones VACÍAS
                     new_row = row_base.copy()
                     new_row['Fecha_Ori_Dt'] = pd.Timestamp(f_dia)
                     if len(cols_keys) > 4:
                         new_row[cols_keys[4]] = f_dia.strftime('%d/%m/%Y')
                     
-                    # Vaciar estrictamente todas las columnas de horas de marcaciones
-                    # H (índice 7), J (índice 9), K (índice 10), M (índice 12)
                     for c_idx in [7, 9, 10, 12]:
                         if c_idx < len(cols_keys):
                             new_row[cols_keys[c_idx]] = None
@@ -482,7 +480,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR CÁLCULOS VERÍDICOS EN LA HOJA MARCACIONES ──
+    # ── PASO 2: APLICAR CÁLCULOS Y EXTRAER CÓDIGO NOVASOFT ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -558,7 +556,6 @@ def procesar_plantilla_geovictoria(
     for idx, row in df_marc.iterrows():
         i = idx + 2
 
-        # Re-escribir columnas base en openpyxl
         cols_df = list(df_marc.columns)
         for col_i, col_name in enumerate(cols_df, start=1):
             val_col = row[col_name]
@@ -590,7 +587,6 @@ def procesar_plantilla_geovictoria(
         
         ws[f'AZ{i}'].value = dia_nombre
 
-        # ── CÁLCULO DE VALORES DE TIEMPO EN PYTHON PARA BA Y BB ──
         h_val, j_val = obtener_val_iloc(row, 7), obtener_val_iloc(row, 9)
         k_val, m_val = obtener_val_iloc(row, 10), obtener_val_iloc(row, 12)
 
@@ -602,7 +598,6 @@ def procesar_plantilla_geovictoria(
         celda_ba = ws[f'BA{i}']
         celda_bb = ws[f'BB{i}']
 
-        # Evaluación de Turno Nocturno (Entrada K > 20:00) o Mínimo/Máximo Estándar
         if hora_k is not None and hora_k > hora_corte_nocturna:
             celda_ba.value = hora_k
             celda_ba.number_format = 'hh:mm:ss AM/PM'
@@ -741,7 +736,7 @@ def procesar_plantilla_geovictoria(
                 val_bw_nova = match_nova.iloc[0]['Codigo_Novasoft']
 
         ws[f'BV{i}'] = val_bv_aus
-        ws[f'BW{i}'] = val_bw_nova
+        ws[f'BW{i}'] = val_bw_nova  # ── Código de Novasoft desde Columna I de BBDD_Novasof ──
 
         val_bx_sic = ""
         if cedula_emp in sic_dict and fecha_ori and pd.notna(fecha_ori):
@@ -1025,7 +1020,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones verídicas y aplicando reglas de negocio..."):
+            with st.spinner("Procesando marcaciones y extrayendo Código Novasoft desde Columna I..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1049,7 +1044,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Información procesada de forma verídica para todas las marcaciones.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Código Novasoft extraído correctamente desde la Columna I en BW.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
