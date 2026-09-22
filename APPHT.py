@@ -215,32 +215,6 @@ st.markdown("""
             display: none !important;
         }
 
-        /* ── AGREGAR TOOLTIP AL BOTÓN DE LA BASE DE DATOS 1 (GEOVICTORIA) ── */
-        div[data-testid="stFileUploader"]:has(input[aria-label*="Geovictoria"]) [data-testid="stFileUploaderDropzone"]::before {
-            content: "📄 Cargar" !important;
-        }
-
-        /* Tooltip en hover con CSS para el primer cargador */
-        div[data-testid="stFileUploader"]:has(input[aria-label*="Geovictoria"]) [data-testid="stFileUploaderDropzone"] {
-            position: relative;
-        }
-        div[data-testid="stFileUploader"]:has(input[aria-label*="Geovictoria"]) [data-testid="stFileUploaderDropzone"]:hover::after {
-            content: "Origen Geovictoria";
-            position: absolute;
-            top: -34px;
-            left: 12px;
-            background-color: #002244;
-            color: #ffffff;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            border-radius: 6px;
-            white-space: nowrap;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 999;
-            pointer-events: none;
-        }
-
         /* Cuadro verde con visto de éxito al cargar archivos */
         [data-testid="stFileUploaderFileData"] > div:first-child,
         [data-testid="stFileUploaderFileData"] svg,
@@ -1055,12 +1029,16 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# ── ACORDEÓN DE CARGA DE ARCHIVOS CON ETIQUETAS ACTUALIZADAS ──
+# ── ACORDEÓN DE CARGA DE ARCHIVOS CON ETIQUETAS ACTUALIZADAS Y TOOLTIP EN GEOVICTORIA ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"])
+        file_entrada = st.file_uploader(
+            "1. BBDD Marcaciones Geovictoria (.xlsx)", 
+            type=["xlsx"], 
+            help="Origen Geovictoria"
+        )
         file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"])
         file_novasoft = st.file_uploader("3. BBDD Ausentismos Novasoft (.xlsx)", type=["xlsx"])
         file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"])
