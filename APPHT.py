@@ -347,13 +347,11 @@ def convertir_a_hora(val):
     return None
 
 def estilo_etiqueta_ausentismo(val):
-    """Aplica formato visual estilo píldora/etiqueta igual al ejemplo de la figura"""
     if pd.isna(val) or not str(val).strip():
         return ''
     
     val_str = str(val).strip().lower()
     
-    # Colores tipo Figura 1 (Fondo rosado suave, borde naranja/durazno, texto vino/rojo oscuro)
     if 'ausencia' in val_str or 'requiere' in val_str:
         return 'background-color: #FCE8E6; color: #991B1B; border: 1.5px solid #FDBA74; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
     elif val_str == 'p':
@@ -866,7 +864,6 @@ def procesar_plantilla_geovictoria(
     bg_azul_header = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
     font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
 
-    # Estilos especiales para la columna Novedad Ausentismo en Excel (Inspirados en la Figura 1)
     fill_nov_rosado = PatternFill(start_color="FCE8E6", end_color="FCE8E6", fill_type="solid")
     font_nov_rojo = Font(name="Calibri", size=10, bold=True, color="991B1B")
 
@@ -888,7 +885,6 @@ def procesar_plantilla_geovictoria(
         c3.alignment = Alignment(horizontal="center", vertical="center")
         c4.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Aplicar formato de etiqueta rosada suave a la novedad
         c4.fill = fill_nov_rosado
         c4.font = font_nov_rojo
 
@@ -1162,9 +1158,9 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         except Exception as e:
             st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
 
-# ── RENDERIZADO PERSISTENTE DE RESULTADOS, TABLA INTERACTIVA Y KPIS ──
+# ── RENDERIZADO PERSISTENTE DE RESULTADOS, KPIS PRIMERO Y TABLA DESPUÉS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Tabla 'Novedades Ausentismo' generada con el formato de la Figura 1.")
+    st.success("✨ ¡Auditoría finalizada con éxito!")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
@@ -1173,39 +1169,7 @@ if st.session_state.get("procesado_exitoso", False):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ── VISTA INTERACTIVA DE NOVEDADES CON FORMATO DE ETIQUETA VISUAL (FIGURA 1) ──
-    if "df_novedades_res" in st.session_state and not st.session_state["df_novedades_res"].empty:
-        df_nov_full = st.session_state["df_novedades_res"]
-
-        st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📋 Detalle de Novedades y Ausentismos</h3>", unsafe_allow_html=True)
-        
-        alertas_disponibles = ["Todas las Alertas"] + sorted(list(df_nov_full["Novedad Ausentismo"].dropna().unique()))
-
-        col_f1, _ = st.columns([1, 2])
-        with col_f1:
-            filtro_alerta_sel = st.selectbox(
-                "Filtrar por Tipo de Alerta / Novedad:",
-                options=alertas_disponibles,
-                index=0
-            )
-
-        if filtro_alerta_sel != "Todas las Alertas":
-            df_nov_display = df_nov_full[df_nov_full["Novedad Ausentismo"] == filtro_alerta_sel]
-        else:
-            df_nov_display = df_nov_full
-
-        # Aplicación del formato de color de la Figura 1 usando pandas.Styler
-        try:
-            df_styled = df_nov_display.style.map(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
-        except AttributeError:
-            df_styled = df_nov_display.style.applymap(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
-
-        st.dataframe(
-            df_styled,
-            use_container_width=True,
-            hide_index=True
-        )
-
+    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (PRIMERO EN PANTALLA) ──
     st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
@@ -1235,3 +1199,35 @@ if st.session_state.get("procesado_exitoso", False):
                 <div class="kpi-subtitle">Filas evaluadas en el periodo</div>
             </div>
         """, unsafe_allow_html=True)
+
+    # ── 2. DETALLE DE NOVEDADES Y AUSENTISMOS CON FILTRO (DESPUÉS DEL RESUMEN) ──
+    if "df_novedades_res" in st.session_state and not st.session_state["df_novedades_res"].empty:
+        df_nov_full = st.session_state["df_novedades_res"]
+
+        st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📋 Detalle de Novedades y Ausentismos</h3>", unsafe_allow_html=True)
+        
+        alertas_disponibles = ["Todas las Alertas"] + sorted(list(df_nov_full["Novedad Ausentismo"].dropna().unique()))
+
+        col_f1, _ = st.columns([1, 2])
+        with col_f1:
+            filtro_alerta_sel = st.selectbox(
+                "Filtrar por Tipo de Alerta / Novedad:",
+                options=alertas_disponibles,
+                index=0
+            )
+
+        if filtro_alerta_sel != "Todas las Alertas":
+            df_nov_display = df_nov_full[df_nov_full["Novedad Ausentismo"] == filtro_alerta_sel]
+        else:
+            df_nov_display = df_nov_full
+
+        try:
+            df_styled = df_nov_display.style.map(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
+        except AttributeError:
+            df_styled = df_nov_display.style.applymap(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
+
+        st.dataframe(
+            df_styled,
+            use_container_width=True,
+            hide_index=True
+        )
