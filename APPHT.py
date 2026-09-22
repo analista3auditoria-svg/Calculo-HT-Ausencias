@@ -346,6 +346,22 @@ def convertir_a_hora(val):
         pass
     return None
 
+def estilo_etiqueta_ausentismo(val):
+    """Aplica formato visual estilo píldora/etiqueta igual al ejemplo de la figura"""
+    if pd.isna(val) or not str(val).strip():
+        return ''
+    
+    val_str = str(val).strip().lower()
+    
+    # Colores tipo Figura 1 (Fondo rosado suave, borde naranja/durazno, texto vino/rojo oscuro)
+    if 'ausencia' in val_str or 'requiere' in val_str:
+        return 'background-color: #FCE8E6; color: #991B1B; border: 1.5px solid #FDBA74; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
+    elif val_str == 'p':
+        return 'background-color: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
+    else:
+        return 'background-color: #E0F2FE; color: #0369A1; border: 1.5px solid #7DD3FC; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
+
+
 def procesar_plantilla_geovictoria(
     file_entrada, sheet_entrada, sheet_festivos,
     file_operativa, sheet_operativa,
@@ -836,7 +852,7 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
-    # ── CREACIÓN DE LA HOJA "Novedades Ausentismo" ──
+    # ── CREACIÓN DE LA HOJA "Novedades Ausentismo" CON FORMATO DE RELLENO Y BORDES ROSADO/NARANJA ──
     nombre_hoja_nov = "Novedades Ausentismo"
     if nombre_hoja_nov in wb.sheetnames:
         ws_nov = wb[nombre_hoja_nov]
@@ -849,6 +865,10 @@ def procesar_plantilla_geovictoria(
     encabezados_nov = ["Cédula", "Nombre", "Fecha", "Novedad Ausentismo"]
     bg_azul_header = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
     font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+    # Estilos especiales para la columna Novedad Ausentismo en Excel (Inspirados en la Figura 1)
+    fill_nov_rosado = PatternFill(start_color="FCE8E6", end_color="FCE8E6", fill_type="solid")
+    font_nov_rojo = Font(name="Calibri", size=10, bold=True, color="991B1B")
 
     for col_idx, text_h in enumerate(encabezados_nov, start=1):
         c = ws_nov.cell(row=1, column=col_idx, value=text_h)
@@ -867,6 +887,10 @@ def procesar_plantilla_geovictoria(
         c2.alignment = Alignment(horizontal="left", vertical="center")
         c3.alignment = Alignment(horizontal="center", vertical="center")
         c4.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Aplicar formato de etiqueta rosada suave a la novedad
+        c4.fill = fill_nov_rosado
+        c4.font = font_nov_rojo
 
         for c_tmp in [c1, c2, c3, c4]:
             c_tmp.border = thin_border
@@ -1140,7 +1164,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS, TABLA INTERACTIVA Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Tabla 'Novedades Ausentismo' lista.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Tabla 'Novedades Ausentismo' generada con el formato de la Figura 1.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
@@ -1149,13 +1173,12 @@ if st.session_state.get("procesado_exitoso", False):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ── VISTA INTERACTIVA DE NOVEDADES CON FILTRO DE ALERTAS SOLICITADO ──
+    # ── VISTA INTERACTIVA DE NOVEDADES CON FORMATO DE ETIQUETA VISUAL (FIGURA 1) ──
     if "df_novedades_res" in st.session_state and not st.session_state["df_novedades_res"].empty:
         df_nov_full = st.session_state["df_novedades_res"]
 
         st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📋 Detalle de Novedades y Ausentismos</h3>", unsafe_allow_html=True)
         
-        # Opciones dinámicas para el filtro de Tipo de Alerta
         alertas_disponibles = ["Todas las Alertas"] + sorted(list(df_nov_full["Novedad Ausentismo"].dropna().unique()))
 
         col_f1, _ = st.columns([1, 2])
@@ -1166,14 +1189,19 @@ if st.session_state.get("procesado_exitoso", False):
                 index=0
             )
 
-        # Aplicar filtro si no es "Todas las Alertas"
         if filtro_alerta_sel != "Todas las Alertas":
             df_nov_display = df_nov_full[df_nov_full["Novedad Ausentismo"] == filtro_alerta_sel]
         else:
             df_nov_display = df_nov_full
 
+        # Aplicación del formato de color de la Figura 1 usando pandas.Styler
+        try:
+            df_styled = df_nov_display.style.map(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
+        except AttributeError:
+            df_styled = df_nov_display.style.applymap(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
+
         st.dataframe(
-            df_nov_display,
+            df_styled,
             use_container_width=True,
             hide_index=True
         )
