@@ -245,6 +245,22 @@ st.markdown("""
             display: none !important;
         }
 
+        /* ── MODIFICACIÓN: EXPANSIÓN ANCHA DE MENÚ DESPLEGABLE EN SELECTBOX ── */
+        div[data-baseweb="popover"],
+        ul[data-testid="stSelectboxVirtualDropdown"] {
+            min-width: 480px !important;
+            width: max-content !important;
+            max-width: 600px !important;
+        }
+
+        ul[data-testid="stSelectboxVirtualDropdown"] li {
+            white-space: normal !important;
+            word-break: break-word !important;
+            padding-top: 8px !important;
+            padding-bottom: 8px !important;
+            line-height: 1.3 !important;
+        }
+
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -440,7 +456,7 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
-    # ── PASO 1: CONSTRUIR ESTRUCTURA DÍA A DÍA SIN MEZCLAR O HEREDAR MARCACIONES ──
+    # ── PASO 1: CONSTRUIR LA ESTRUCTURA CONTINUA DÍA A DÍA POR CADA TRABAJADOR ──
     df_marc_raw['Fecha_Ori_Dt'] = df_marc_raw.apply(
         lambda r: pd.to_datetime(str(r.iloc[4])[-10:], dayfirst=True, errors='coerce') if len(str(r.iloc[4])) >= 10 else pd.NaT,
         axis=1
@@ -479,7 +495,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR CÁLCULOS EN LA HOJA MARCACIONES ──
+    # ── PASO 2: APLICAR CÁLCULOS Y EXTRAER CÓDIGO NOVASOFT ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -939,17 +955,7 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# Configuración del Panel Lateral
-st.sidebar.markdown("## ⚙️ Parámetros")
-
-# ── EXTRACCIÓN DINÁMICA DE CENTROS DE COSTOS DESDE HOJA "data" EN HISTORIAL LABORAL ──
-# Esta lectura previa ocurre de forma segura si el usuario ha cargado el archivo #6
-lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]  # Valor por defecto inicial
-
-# Cargar la lista si el usuario subió el archivo #6 de Historial Laboral
-file_historial_input = st.sidebar.file_uploader if False else None  # Declaración vacía para evaluar estado de widget más abajo
-
-# ── ACORDEÓN DE CARGA DE ARCHIVOS ──
+# ── ACORDEÓN DE CARGA DE ARCHIVOS PRINCIPALES Y COMPLEMENTARIOS ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
@@ -987,27 +993,31 @@ with st.expander("📁 Bases de datos", expanded=True):
             </div>
         """, unsafe_allow_html=True)
 
-# Lógica dinámica para extraer la lista de CC desde la hoja "data" de Historial Laboral
+# ── LÓGICA ROBUSTA PARA LEER LA HOJA "data" EN EL ARCHIVO #6 (HISTORIAL LABORAL) ──
+lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]
+
 if file_historial:
     try:
         excel_hist_temp = pd.ExcelFile(file_historial)
-        target_data_sheet = "data"
+        target_data_sheet = None
         for sheet_name in excel_hist_temp.sheet_names:
             if sheet_name.strip().lower() == "data":
                 target_data_sheet = sheet_name
                 break
         
-        df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
-        if not df_cc_data.empty:
-            centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
-            # Filtrar encabezados si están presentes
-            centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
-            if centros_extraidos:
-                lista_cc = sorted(list(set(centros_extraidos)))
-    except Exception:
-        pass
+        if target_data_sheet:
+            df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
+            if not df_cc_data.empty:
+                centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
+                centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
+                if centros_extraidos:
+                    lista_cc = sorted(list(set(centros_extraidos)))
+    except Exception as e:
+        st.warning(f"⚠️ No se pudo leer la hoja 'data' del Historial Laboral: {e}")
 
-# Desplegable dinámico en el Panel Lateral
+# Configuración del Panel Lateral
+st.sidebar.markdown("## ⚙️ Parámetros")
+
 contrato_principal = st.sidebar.selectbox(
     "Contrato / CC Principal",
     options=lista_cc,
@@ -1023,7 +1033,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Selecciona el Centro de Costos de la lista.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Carga el archivo <b>6. Historial Laboral</b> en la casilla correspondiente.<br>2. Selecciona el Centro de Costos del menú.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1052,7 +1062,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones y aplicando reglas con el Centro de Costos seleccionado..."):
+            with st.spinner("Procesando marcaciones y extrayendo datos con la lista de Centros de Costos..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1076,7 +1086,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Procesado con la lista de Centros de Costos de la hoja 'data'.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Menú desplegable ampliado para visualización completa.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
