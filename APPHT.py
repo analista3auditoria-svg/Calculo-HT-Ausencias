@@ -214,6 +214,7 @@ st.markdown("""
             display: none !important;
         }
 
+        /* Cuadro verde con visto de éxito al cargar archivos */
         [data-testid="stFileUploaderFileData"] > div:first-child,
         [data-testid="stFileUploaderFileData"] svg,
         div[data-testid="stFileUploaderFileData"] > span:first-child {
@@ -418,8 +419,6 @@ def procesar_plantilla_geovictoria(
         df_nova['Concepto'] = df_nova.apply(lambda r: obtener_val_iloc(r, 2), axis=1)
         df_nova['Fecha_Inicio'] = pd.to_datetime(df_nova.iloc[:, 3], dayfirst=True, errors='coerce') if df_nova.shape[1] > 3 else pd.NaT
         df_nova['Fecha_Fin'] = pd.to_datetime(df_nova.iloc[:, 4], dayfirst=True, errors='coerce') if df_nova.shape[1] > 4 else pd.NaT
-        
-        # ── AJUSTE: LEER CÓDIGO NOVASOFT DESDE LA COLUMNA I (ÍNDICE 8) DE BBDD NOVASOFT ──
         df_nova['Codigo_Novasoft'] = df_nova.apply(lambda r: obtener_val_iloc(r, 8), axis=1)
 
     if not df_sic.empty:
@@ -480,7 +479,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR CÁLCULOS Y EXTRAER CÓDIGO NOVASOFT ──
+    # ── PASO 2: APLICAR CÁLCULOS EN LA HOJA MARCACIONES ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -736,7 +735,7 @@ def procesar_plantilla_geovictoria(
                 val_bw_nova = match_nova.iloc[0]['Codigo_Novasoft']
 
         ws[f'BV{i}'] = val_bv_aus
-        ws[f'BW{i}'] = val_bw_nova  # ── Código de Novasoft desde Columna I de BBDD_Novasof ──
+        ws[f'BW{i}'] = val_bw_nova
 
         val_bx_sic = ""
         if cedula_emp in sic_dict and fecha_ori and pd.notna(fecha_ori):
@@ -942,22 +941,15 @@ def procesar_plantilla_geovictoria(
 
 # Configuración del Panel Lateral
 st.sidebar.markdown("## ⚙️ Parámetros")
-contrato_principal = st.sidebar.text_input("Contrato / CC Principal", value="FUNDACION HOSPITAL DE LA MISERICORDIA")
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📅 Filtro Rango de Fechas")
-fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 2, 1))
-fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 2, 28))
+# ── EXTRACCIÓN DINÁMICA DE CENTROS DE COSTOS DESDE HOJA "data" EN HISTORIAL LABORAL ──
+# Esta lectura previa ocurre de forma segura si el usuario ha cargado el archivo #6
+lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]  # Valor por defecto inicial
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("""
-<div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
-    <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Ajusta las fechas del periodo.<br>3. Ejecuta la auditoría.</small>
-</div>
-""", unsafe_allow_html=True)
+# Cargar la lista si el usuario subió el archivo #6 de Historial Laboral
+file_historial_input = st.sidebar.file_uploader if False else None  # Declaración vacía para evaluar estado de widget más abajo
 
-# ── 1. ACORDEÓN PRINCIPAL: "Bases de datos" ──
+# ── ACORDEÓN DE CARGA DE ARCHIVOS ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
@@ -995,6 +987,46 @@ with st.expander("📁 Bases de datos", expanded=True):
             </div>
         """, unsafe_allow_html=True)
 
+# Lógica dinámica para extraer la lista de CC desde la hoja "data" de Historial Laboral
+if file_historial:
+    try:
+        excel_hist_temp = pd.ExcelFile(file_historial)
+        target_data_sheet = "data"
+        for sheet_name in excel_hist_temp.sheet_names:
+            if sheet_name.strip().lower() == "data":
+                target_data_sheet = sheet_name
+                break
+        
+        df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
+        if not df_cc_data.empty:
+            centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
+            # Filtrar encabezados si están presentes
+            centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
+            if centros_extraidos:
+                lista_cc = sorted(list(set(centros_extraidos)))
+    except Exception:
+        pass
+
+# Desplegable dinámico en el Panel Lateral
+contrato_principal = st.sidebar.selectbox(
+    "Contrato / CC Principal",
+    options=lista_cc,
+    index=0
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📅 Filtro Rango de Fechas")
+fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 2, 1))
+fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 2, 28))
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+<div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
+    <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
+    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Selecciona el Centro de Costos de la lista.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+</div>
+""", unsafe_allow_html=True)
+
 # ── 2. ACORDEÓN SECUNDARIO: Configuración Avanzada ──
 with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
     st.caption("Solo modifica estos campos si los libros de Excel tienen nombres de hoja diferentes a los estándar.")
@@ -1017,10 +1049,10 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
     if not file_entrada:
         st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
     elif not contrato_principal:
-        st.error("⚠️ Por favor, ingresa el valor del Contrato Principal en el panel izquierdo.")
+        st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones y extrayendo Código Novasoft desde Columna I..."):
+            with st.spinner("Procesando marcaciones y aplicando reglas con el Centro de Costos seleccionado..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1044,7 +1076,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Código Novasoft extraído correctamente desde la Columna I en BW.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Procesado con la lista de Centros de Costos de la hoja 'data'.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
