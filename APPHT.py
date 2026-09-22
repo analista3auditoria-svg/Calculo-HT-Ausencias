@@ -302,7 +302,6 @@ st.sidebar.markdown("---")
 
 if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
     
-    # --- FUNCIONES DE APOYO DEL MÓDULO 1 ---
     def obtener_val_iloc(row, index_col):
         if isinstance(row, dict):
             keys = list(row.keys())
@@ -1412,10 +1411,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
             st.session_state.procesado_m2 = False
             st.session_state.output_bytes_m2 = None
             st.session_state.htcc_bytes_m2 = None
-            st.session_state.listado_m2 = None
-            st.session_state.resumen_m2 = None
-            st.session_state.df_c_m2 = None
-            st.session_state.resultados_c_m2 = None
 
         if st.button("🚀 Procesar Información y Generar Análisis", type="primary"):
             with st.spinner("Procesando datos y estructurando archivos de Excel..."):
@@ -2218,16 +2213,12 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     
                     st.session_state.output_bytes_m2 = output_buffer.getvalue()
                     st.session_state.htcc_bytes_m2 = htcc_buffer.getvalue()
-                    st.session_state.listado_m2 = listado
-                    st.session_state.resumen_m2 = resumen
-                    st.session_state.df_c_m2 = df_c
-                    st.session_state.resultados_c_m2 = resultados_c
                     st.session_state.procesado_m2 = True
 
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error inesperado al procesar: {e}")
 
-        # ── BLOQUE DE RENDERIZADO VISUAL DEL MÓDULO 2 ──
+        # ── DESCARGA DE ARCHIVOS SIN MOSTRAR TABLAS VISUALES EN PANTALLA ──
         if st.session_state.get("procesado_m2", False):
             st.success("🎉 ¡Reporte y Consolidación Multi-Periodo procesados exitosamente!")
             
@@ -2248,47 +2239,3 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="d_btn_m2_2"
                 )
-
-            st.markdown("---")
-            st.header("📋 Vista Previa de Resultados")
-            
-            tab_aus, tab_comp = st.tabs([
-                "📄 Hoja de Ausencias", 
-                "🔍 Análisis de Compensatorios"
-            ])
-
-            with tab_aus:
-                col_titulo, col_metrica = st.columns([3, 1])
-                with col_titulo:
-                    st.subheader("Registros Detallados de Ausencias")
-                with col_metrica:
-                    total_ausencias = len(st.session_state.listado_m2)
-                    st.markdown(f"""
-                        <div style="background-color:#FFEB9C; padding:5px 15px; border-radius:15px; text-align:center; border:1px solid #FFC7CE; margin-top:5px;">
-                            <strong style="color:#9C0006; font-size:16px;">Total: {total_ausencias}</strong>
-                        </div>
-                    """, unsafe_allow_html=True)
-                st.dataframe(st.session_state.listado_m2, use_container_width=True, hide_index=True)
-                st.subheader("Resumen Consolidado por Persona")
-                st.dataframe(st.session_state.resumen_m2, use_container_width=True, hide_index=True)
-                
-            with tab_comp:
-                st.subheader("Validación de Compensatorios (Analisis C)")
-                if st.session_state.resultados_c_m2:
-                    st.write("Filtrar por Estado:")
-                    col_cumple, col_nocumple, _ = st.columns([1, 1, 3])
-                    with col_cumple:
-                        chk_cumple = st.checkbox("CUMPLE", value=True, key="filtro_cumple_m2")
-                    with col_nocumple:
-                        chk_nocumple = st.checkbox("NO CUMPLE", value=True, key="filtro_nocumple_m2")
-                    
-                    estados_activos = []
-                    if chk_cumple:
-                        estados_activos.append("CUMPLE")
-                    if chk_nocumple:
-                        estados_activos.append("NO CUMPLE")
-                    
-                    df_c_filtrado = st.session_state.df_c_m2[st.session_state.df_c_m2["Estado"].isin(estados_activos)]
-                    st.dataframe(df_c_filtrado, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No se encontraron registros de compensatorios que requieran validación para el periodo seleccionado.")
