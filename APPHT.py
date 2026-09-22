@@ -128,18 +128,12 @@ st.markdown("""
             font-size: 36px;
             font-weight: 800;
             line-height: 1;
-            margin-bottom: 6px;
+            margin-bottom: 0px;
         }
         .kpi-value-danger { color: #dc2626; }
         .kpi-value-warning { color: #d97706; }
         .kpi-value-info { color: #00529B; }
         .kpi-value-success { color: #16a34a; }
-
-        .kpi-subtitle {
-            font-size: 12px;
-            font-weight: 500;
-            color: #64748b;
-        }
 
         [data-testid="stFileUploader"] {
             padding: 0px;
@@ -1144,7 +1138,7 @@ if st.session_state.get("procesado_exitoso", False):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (NUEVO ORDEN SOLICITADO) ──
+    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (TARJETAS SIN TEXTO INFERIOR) ──
     st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
     kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
@@ -1159,7 +1153,6 @@ if st.session_state.get("procesado_exitoso", False):
             <div class="kpi-card kpi-card-info">
                 <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
                 <div class="kpi-value kpi-value-info">{total_proc:,}</div>
-                <div class="kpi-subtitle">Filas evaluadas en el periodo</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1169,7 +1162,6 @@ if st.session_state.get("procesado_exitoso", False):
             <div class="kpi-card kpi-card-success">
                 <div class="kpi-title kpi-title-success">✅ Procesados con Éxito</div>
                 <div class="kpi-value kpi-value-success">{exito_val:,}</div>
-                <div class="kpi-subtitle">Registros procesados correctamente sin novedades</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1179,7 +1171,6 @@ if st.session_state.get("procesado_exitoso", False):
             <div class="kpi-card kpi-card-danger">
                 <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
                 <div class="kpi-value kpi-value-danger">{ausencias_val:,}</div>
-                <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -1189,7 +1180,6 @@ if st.session_state.get("procesado_exitoso", False):
             <div class="kpi-card kpi-card-warning">
                 <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
                 <div class="kpi-value kpi-value-warning">{erroneas_val:,}</div>
-                <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
             </div>
         """, unsafe_allow_html=True)
 
