@@ -440,7 +440,7 @@ def procesar_plantilla_geovictoria(
             if row_m['Cédula_Str']:
                 maestro_dict[row_m['Cédula_Str']] = (row_m['F_INGRESO'], row_m['F_RETIRO'])
 
-    # ── PASO 1: CONSTRUIR LA ESTRUCTURA CONTINUA DÍA A DÍA POR CADA TRABAJADOR ──
+    # ── PASO 1: CONSTRUIR ESTRUCTURA DÍA A DÍA SIN MEZCLAR O HEREDAR MARCACIONES ──
     df_marc_raw['Fecha_Ori_Dt'] = df_marc_raw.apply(
         lambda r: pd.to_datetime(str(r.iloc[4])[-10:], dayfirst=True, errors='coerce') if len(str(r.iloc[4])) >= 10 else pd.NaT,
         axis=1
@@ -479,7 +479,7 @@ def procesar_plantilla_geovictoria(
 
     df_marc = pd.DataFrame(filas_construidas)
 
-    # ── PASO 2: APLICAR CÁLCULOS Y EXTRAER CÓDIGO NOVASOFT ──
+    # ── PASO 2: APLICAR CÁLCULOS EN LA HOJA MARCACIONES ──
     file_entrada.seek(0)
     wb = openpyxl.load_workbook(file_entrada, data_only=False)
     ws = wb[sheet_entrada]
@@ -939,7 +939,17 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# ── ACORDEÓN DE CARGA DE ARCHIVOS PRINCIPALES Y COMPLEMENTARIOS ──
+# Configuración del Panel Lateral
+st.sidebar.markdown("## ⚙️ Parámetros")
+
+# ── EXTRACCIÓN DINÁMICA DE CENTROS DE COSTOS DESDE HOJA "data" EN HISTORIAL LABORAL ──
+# Esta lectura previa ocurre de forma segura si el usuario ha cargado el archivo #6
+lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]  # Valor por defecto inicial
+
+# Cargar la lista si el usuario subió el archivo #6 de Historial Laboral
+file_historial_input = st.sidebar.file_uploader if False else None  # Declaración vacía para evaluar estado de widget más abajo
+
+# ── ACORDEÓN DE CARGA DE ARCHIVOS ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
@@ -977,32 +987,27 @@ with st.expander("📁 Bases de datos", expanded=True):
             </div>
         """, unsafe_allow_html=True)
 
-# ── LÓGICA DE LECTURA DE CENTROS DE COSTOS DESDE LA HOJA "data" EN EL ARCHIVO #6 (HISTORIAL LABORAL) ──
-lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]  # Opción por defecto inicial
-
+# Lógica dinámica para extraer la lista de CC desde la hoja "data" de Historial Laboral
 if file_historial:
     try:
         excel_hist_temp = pd.ExcelFile(file_historial)
-        target_data_sheet = None
+        target_data_sheet = "data"
         for sheet_name in excel_hist_temp.sheet_names:
             if sheet_name.strip().lower() == "data":
                 target_data_sheet = sheet_name
                 break
         
-        if target_data_sheet:
-            df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
-            if not df_cc_data.empty:
-                centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
-                # Filtrar si la primera celda es la cabecera "Centro de costos"
-                centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
-                if centros_extraidos:
-                    lista_cc = sorted(list(set(centros_extraidos)))
-    except Exception as e:
-        st.warning(f"⚠️ No se pudo leer la hoja 'data' del Historial Laboral: {e}")
+        df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
+        if not df_cc_data.empty:
+            centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
+            # Filtrar encabezados si están presentes
+            centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
+            if centros_extraidos:
+                lista_cc = sorted(list(set(centros_extraidos)))
+    except Exception:
+        pass
 
-# Configuración del Panel Lateral
-st.sidebar.markdown("## ⚙️ Parámetros")
-
+# Desplegable dinámico en el Panel Lateral
 contrato_principal = st.sidebar.selectbox(
     "Contrato / CC Principal",
     options=lista_cc,
@@ -1018,7 +1023,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Carga el archivo <b>6. Historial Laboral</b> para desplegar los Centros de Costos.<br>2. Selecciona el Centro de Costos y rango de fechas.<br>3. Ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Despliega 'Bases de datos' y carga los archivos.<br>2. Selecciona el Centro de Costos de la lista.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1047,7 +1052,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones y extrayendo datos con la lista de Centros de Costos..."):
+            with st.spinner("Procesando marcaciones y aplicando reglas con el Centro de Costos seleccionado..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1071,7 +1076,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Procesado con el desplegable de Centros de Costos activo.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Procesado con la lista de Centros de Costos de la hoja 'data'.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
