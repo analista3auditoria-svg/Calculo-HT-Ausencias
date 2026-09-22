@@ -257,9 +257,9 @@ st.markdown("""
             background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
             color: white !important;
             border-radius: 10px !important;
-            padding: 12px 28px !important;
+            padding: 10px 20px !important;
             font-weight: 700 !important;
-            font-size: 16px !important;
+            font-size: 14px !important;
             border: none !important;
             box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
             width: 100%;
@@ -322,6 +322,15 @@ def estilo_etiqueta_ausentismo(val):
         return 'background-color: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
     else:
         return 'background-color: #E0F2FE; color: #0369A1; border: 1.5px solid #7DD3FC; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
+
+
+def df_a_excel_bytes(df, sheet_name="Detalle_Novedades"):
+    """Convierte un DataFrame a bytes de Excel (.xlsx) con openpyxl"""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+    output.seek(0)
+    return output.getvalue()
 
 
 def procesar_plantilla_geovictoria(
@@ -1132,7 +1141,7 @@ if st.session_state.get("procesado_exitoso", False):
     st.success("✨ ¡Auditoría finalizada con éxito!")
     
     st.download_button(
-        label="📥 Descargar Resultado Calculado (Excel)",
+        label="📥 Descargar Resultado Calculado Completo (Excel Completo)",
         data=st.session_state["excel_salida"],
         file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1183,7 +1192,7 @@ if st.session_state.get("procesado_exitoso", False):
             </div>
         """, unsafe_allow_html=True)
 
-    # ── 2. DETALLE DE NOVEDADES Y AUSENTISMOS CON FILTRO (DESPUÉS DEL RESUMEN) ──
+    # ── 2. DETALLE DE NOVEDADES Y AUSENTISMOS CON FILTRO Y DESCARGA A EXCEL ──
     if "df_novedades_res" in st.session_state and not st.session_state["df_novedades_res"].empty:
         df_nov_full = st.session_state["df_novedades_res"]
 
@@ -1191,7 +1200,7 @@ if st.session_state.get("procesado_exitoso", False):
         
         alertas_disponibles = ["Todas las Alertas"] + sorted(list(df_nov_full["Novedad Ausentismo"].dropna().unique()))
 
-        col_f1, _ = st.columns([1, 2])
+        col_f1, col_f2 = st.columns([2, 1])
         with col_f1:
             filtro_alerta_sel = st.selectbox(
                 "Filtrar por Tipo de Alerta / Novedad:",
@@ -1203,6 +1212,17 @@ if st.session_state.get("procesado_exitoso", False):
             df_nov_display = df_nov_full[df_nov_full["Novedad Ausentismo"] == filtro_alerta_sel]
         else:
             df_nov_display = df_nov_full
+
+        # Botón para descargar únicamente los datos visibles de esta tabla en Excel (.xlsx)
+        with col_f2:
+            st.markdown("<div style='padding-top: 28px;'></div>", unsafe_allow_html=True)
+            bytes_excel_tabla = df_a_excel_bytes(df_nov_display, sheet_name="Novedades_Filtradas")
+            st.download_button(
+                label="📊 Exportar Tabla a Excel (.xlsx)",
+                data=bytes_excel_tabla,
+                file_name=f"Detalle_Novedades_{filtro_alerta_sel.replace(' ', '_')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
         try:
             df_styled = df_nov_display.style.map(estilo_etiqueta_ausentismo, subset=["Novedad Ausentismo"])
