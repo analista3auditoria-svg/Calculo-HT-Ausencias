@@ -1180,7 +1180,7 @@ if st.session_state.get("procesado_exitoso", False):
     with kpi_col3:
         st.markdown(f"""
             <div class="kpi-card kpi-card-danger">
-                <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
+                <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales</div>
                 <div class="kpi-value kpi-value-danger">{ausencias_val:,}</div>
             </div>
         """, unsafe_allow_html=True)
