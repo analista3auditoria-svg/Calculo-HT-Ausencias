@@ -188,6 +188,7 @@ st.markdown("""
             gap: 12px !important;
             min-height: 46px !important;
             transition: all 0.2s ease;
+            position: relative;
         }
         [data-testid="stFileUploaderDropzone"]:hover {
             background-color: #f0f7ff !important;
@@ -212,6 +213,32 @@ st.markdown("""
         }
         [data-testid="stFileUploaderDropzone"] button {
             display: none !important;
+        }
+
+        /* ── AGREGAR TOOLTIP AL BOTÓN DE LA BASE DE DATOS 1 (GEOVICTORIA) ── */
+        div[data-testid="stFileUploader"]:has(input[aria-label*="Geovictoria"]) [data-testid="stFileUploaderDropzone"]::before {
+            content: "📄 Cargar" !important;
+        }
+
+        /* Tooltip en hover con CSS para el primer cargador */
+        div[data-testid="stFileUploader"]:has(input[aria-label*="Geovictoria"]) [data-testid="stFileUploaderDropzone"] {
+            position: relative;
+        }
+        div[data-testid="stFileUploader"]:has(input[aria-label*="Geovictoria"]) [data-testid="stFileUploaderDropzone"]:hover::after {
+            content: "Origen Geovictoria";
+            position: absolute;
+            top: -34px;
+            left: 12px;
+            background-color: #002244;
+            color: #ffffff;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 6px;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 999;
+            pointer-events: none;
         }
 
         /* Cuadro verde con visto de éxito al cargar archivos */
