@@ -81,6 +81,43 @@ st.markdown("""
             font-weight: 500;
         }
 
+        .card-container {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px -2px rgba(0,0,0,0.04);
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #00529B;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f0f7ff;
+        }
+
+        .file-status-ok {
+            background-color: #dcfce7;
+            color: #15803d;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .file-status-pending {
+            background-color: #f1f5f9;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+
         .kpi-card {
             background-color: #ffffff;
             border-radius: 16px;
@@ -992,7 +1029,7 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# ── ACORDEÓN DE CARGA DE ARCHIVOS CON ETIQUETAS ACTUALIZADAS Y TOOLTIP EN GEOVICTORIA ──
+# ── ACORDEÓN DE CARGA DE ARCHIVOS CON TOOLTIPS SOLICITADOS ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
@@ -1002,19 +1039,38 @@ with st.expander("📁 Bases de datos", expanded=True):
             type=["xlsx"], 
             help="Origen Geovictoria"
         )
-        file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"])
-        file_novasoft = st.file_uploader("3. BBDD Ausentismos Novasoft (.xlsx)", type=["xlsx"])
-        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"])
-
-        status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
+        file_operativa = st.file_uploader(
+            "2. BBDD Nómina Compensación de tiempo (.xlsx)", 
+            type=["xlsx"],
+            help="BD que el supervisor envía a nómina con los compensatorios"
+        )
+        file_novasoft = st.file_uploader(
+            "3. BBDD Ausentismos Novasoft (.xlsx)", 
+            type=["xlsx"],
+            help="Archivos descargados por el usuario de Novasoft"
+        )
+        file_supernumerario = st.file_uploader(
+            "7. BBDD Ubicaciones (.xlsx)", 
+            type=["xlsx"],
+            help="Ubicaciones descargadas del módulo de supernumerarios"
+        )
 
     with col2:
-        file_sic = st.file_uploader("4. BBDD Gestión de personal SIC (.xlsx)", type=["xlsx"])
-        file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"])
-        file_historial = st.file_uploader("6. BBDD Historia laboral de empleados (.xlsx)", type=["xlsx"])
-
-        count_comp = sum(1 for x in [file_sic, file_maestro, file_historial, file_supernumerario] if x is not None)
-        status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
+        file_sic = st.file_uploader(
+            "4. BBDD Gestión de personal SIC (.xlsx)", 
+            type=["xlsx"],
+            help="Archivo descargado por el usuario del módulo SIC"
+        )
+        file_maestro = st.file_uploader(
+            "5. BBDD Maestro de empleados (.xlsx)", 
+            type=["xlsx"],
+            help="BD maestro del personal de la compañía"
+        )
+        file_historial = st.file_uploader(
+            "6. BBDD Historia laboral de empleados (.xlsx)", 
+            type=["xlsx"],
+            help="BD descargada del SIC"
+        )
 
 # ── LÓGICA ROBUSTA PARA LEER LA HOJA "data" EN EL ARCHIVO #6 (HISTORIA LABORAL) ──
 lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]
