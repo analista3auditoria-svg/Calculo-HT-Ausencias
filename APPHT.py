@@ -178,23 +178,26 @@ st.markdown("""
             display: none !important;
         }
 
-        /* Cuadro verde con visto de éxito al cargar archivos */
+        /* ── MODIFICACIÓN: CUADROS DE ARCHIVOS CARGADOS EN COLOR VERDE ── */
         [data-testid="stFileUploaderFileData"] > div:first-child,
         [data-testid="stFileUploaderFileData"] svg,
-        div[data-testid="stFileUploaderFileData"] > span:first-child {
-            background-color: #dcfce7 !important;
-            color: #15803d !important;
+        div[data-testid="stFileUploaderFileData"] > span:first-child,
+        [data-testid="stFileUploaderFileData"] [data-testid="stFileUploaderDeleteBtn"] ~ div,
+        [data-testid="stFileUploaderFileData"] > div {
+            background-color: #059669 !important;
+            color: #ffffff !important;
             border-radius: 8px !important;
-            fill: #15803d !important;
+            fill: #ffffff !important;
         }
 
+        /* Icono / Visto bueno verde sobre el recuadro verde */
         [data-testid="stFileUploaderFileData"] > div:first-child::after {
             content: "✓" !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            background-color: #dcfce7 !important;
-            color: #15803d !important;
+            background-color: #059669 !important;
+            color: #ffffff !important;
             font-weight: 800 !important;
             font-size: 16px !important;
             width: 32px !important;
@@ -325,7 +328,6 @@ def estilo_etiqueta_ausentismo(val):
 
 
 def df_a_excel_bytes(df, sheet_name="Detalle_Novedades"):
-    """Convierte un DataFrame a bytes de Excel (.xlsx) con openpyxl"""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
@@ -1213,7 +1215,6 @@ if st.session_state.get("procesado_exitoso", False):
         else:
             df_nov_display = df_nov_full
 
-        # Botón para descargar únicamente los datos visibles de esta tabla en Excel (.xlsx)
         with col_f2:
             st.markdown("<div style='padding-top: 28px;'></div>", unsafe_allow_html=True)
             bytes_excel_tabla = df_a_excel_bytes(df_nov_display, sheet_name="Novedades_Filtradas")
