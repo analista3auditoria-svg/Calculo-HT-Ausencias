@@ -81,43 +81,6 @@ st.markdown("""
             font-weight: 500;
         }
 
-        .card-container {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 20px 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px -2px rgba(0,0,0,0.04);
-        }
-        .section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #00529B;
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 14px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #f0f7ff;
-        }
-
-        .file-status-ok {
-            background-color: #dcfce7;
-            color: #15803d;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 4px 10px;
-            border-radius: 20px;
-        }
-        .file-status-pending {
-            background-color: #f1f5f9;
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 500;
-            padding: 4px 10px;
-            border-radius: 20px;
-        }
-
         .kpi-card {
             background-color: #ffffff;
             border-radius: 16px;
@@ -1029,7 +992,7 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# ── ACORDEÓN DE CARGA DE ARCHIVOS CON TOOLTIPS SOLICITADOS ──
+# ── ACORDEÓN DE CARGA DE ARCHIVOS CON TOOLTIPS SOLICITADOS EN CADA BASE DE DATOS ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
