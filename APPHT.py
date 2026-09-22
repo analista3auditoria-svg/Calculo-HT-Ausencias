@@ -245,7 +245,7 @@ st.markdown("""
             display: none !important;
         }
 
-        /* ── MODIFICACIÓN: OPCIÓN DE AGRANDAR/RECONFIGURAR VENTANA DESPLEGABLE EN LA ESQUINA ── */
+        /* Ventana desplegable del selectbox redimensionable */
         div[data-baseweb="popover"],
         div[data-baseweb="menu"] {
             resize: both !important;
@@ -965,15 +965,15 @@ def procesar_plantilla_geovictoria(
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
 
-# ── ACORDEÓN DE CARGA DE ARCHIVOS PRINCIPALES Y COMPLEMENTARIOS ──
+# ── ACORDEÓN DE CARGA DE ARCHIVOS CON ETIQUETAS ACTUALIZADAS ──
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        file_entrada = st.file_uploader("1. Marcaciones GeoVictoria (.xlsx)", type=["xlsx"])
-        file_operativa = st.file_uploader("2. Base Operativa (.xlsx)", type=["xlsx"])
-        file_novasoft = st.file_uploader("3. BBDD Novasoft (.xlsx)", type=["xlsx"])
-        file_supernumerario = st.file_uploader("7. BD Supernumerario (.xlsx)", type=["xlsx"])
+        file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"])
+        file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"])
+        file_novasoft = st.file_uploader("3. BBDD Ausentismos Novasoft (.xlsx)", type=["xlsx"])
+        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"])
 
         status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
 
@@ -987,9 +987,9 @@ with st.expander("📁 Bases de datos", expanded=True):
         """, unsafe_allow_html=True)
 
     with col2:
-        file_sic = st.file_uploader("4. Informe SIC (.xlsx)", type=["xlsx"])
-        file_maestro = st.file_uploader("5. Base Maestro (.xlsx)", type=["xlsx"])
-        file_historial = st.file_uploader("6. Historial Laboral (.xlsx)", type=["xlsx"])
+        file_sic = st.file_uploader("4. BBDD Gestión de personal SIC (.xlsx)", type=["xlsx"])
+        file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"])
+        file_historial = st.file_uploader("6. BBDD Historia laboral de empleados (.xlsx)", type=["xlsx"])
 
         count_comp = sum(1 for x in [file_sic, file_maestro, file_historial, file_supernumerario] if x is not None)
         status_c = f'<span class="file-status-ok">✔ {count_comp}/4 Cargados</span>' if count_comp > 0 else '<span class="file-status-pending">Opcionales</span>'
@@ -1003,7 +1003,7 @@ with st.expander("📁 Bases de datos", expanded=True):
             </div>
         """, unsafe_allow_html=True)
 
-# ── LÓGICA ROBUSTA PARA LEER LA HOJA "data" EN EL ARCHIVO #6 (HISTORIAL LABORAL) ──
+# ── LÓGICA ROBUSTA PARA LEER LA HOJA "data" EN EL ARCHIVO #6 (HISTORIA LABORAL) ──
 lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]
 
 if file_historial:
@@ -1043,7 +1043,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Carga el archivo <b>6. Historial Laboral</b> en la casilla correspondiente.<br>2. Selecciona el Centro de Costos del menú.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Carga el archivo <b>6. BBDD Historia laboral de empleados</b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1096,7 +1096,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
 
 # ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Menú desplegable ampliado para visualización completa.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Nombres de las bases de datos actualizados.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
