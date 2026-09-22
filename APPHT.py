@@ -1189,7 +1189,7 @@ if st.session_state.get("procesado_exitoso", False):
     with kpi_col4:
         st.markdown(f"""
             <div class="kpi-card kpi-card-warning">
-                <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
+                <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Incompletas</div>
                 <div class="kpi-value kpi-value-warning">{erroneas_val:,}</div>
             </div>
         """, unsafe_allow_html=True)
