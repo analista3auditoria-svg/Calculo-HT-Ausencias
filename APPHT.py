@@ -310,8 +310,8 @@ st.markdown("""
         <div class="header-brand-content">
             <img src="https://cdn1.totalcommerce.cloud/casalimpia/web_content/assets/logo-casa-limpia.svg" alt="Casalimpia Logo" />
             <div class="title-text">
-                <h1>Auditor TS & Módulo GeoVictoria</h1>
-                <p>Plataforma Corporativa de Procesamiento y Auditoría de Tiempos y Ausentismos</p>
+                <h1>Modelo Auditoría Trabajo Suplementario</h1>
+                <p>Ausentismos vs Novasoft</p>
             </div>
         </div>
     </div>
