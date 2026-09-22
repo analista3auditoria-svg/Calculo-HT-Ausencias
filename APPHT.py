@@ -245,12 +245,22 @@ st.markdown("""
             display: none !important;
         }
 
-        /* ── MODIFICACIÓN: EXPANSIÓN ANCHA DE MENÚ DESPLEGABLE EN SELECTBOX ── */
+        /* ── MODIFICACIÓN: OPCIÓN DE AGRANDAR/RECONFIGURAR VENTANA DESPLEGABLE EN LA ESQUINA ── */
         div[data-baseweb="popover"],
+        div[data-baseweb="menu"] {
+            resize: both !important;
+            overflow: auto !important;
+            min-width: 380px !important;
+            min-height: 200px !important;
+            max-width: 90vw !important;
+            max-height: 80vh !important;
+        }
+
         ul[data-testid="stSelectboxVirtualDropdown"] {
-            min-width: 480px !important;
-            width: max-content !important;
-            max-width: 600px !important;
+            resize: both !important;
+            overflow: auto !important;
+            min-width: 380px !important;
+            width: 100% !important;
         }
 
         ul[data-testid="stSelectboxVirtualDropdown"] li {
