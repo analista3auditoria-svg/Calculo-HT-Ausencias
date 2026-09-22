@@ -1144,7 +1144,7 @@ if st.session_state.get("procesado_exitoso", False):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (4 TARJETAS) ──
+    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (NUEVO ORDEN SOLICITADO) ──
     st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
     kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
@@ -1153,25 +1153,8 @@ if st.session_state.get("procesado_exitoso", False):
     erroneas_val = st.session_state["kpi_p"]
     exito_val = max(0, total_proc - (ausencias_val + erroneas_val))
 
+    # 1. Total Registros Procesados
     with kpi_col1:
-        st.markdown(f"""
-            <div class="kpi-card kpi-card-danger">
-                <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
-                <div class="kpi-value kpi-value-danger">{ausencias_val:,}</div>
-                <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with kpi_col2:
-        st.markdown(f"""
-            <div class="kpi-card kpi-card-warning">
-                <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
-                <div class="kpi-value kpi-value-warning">{erroneas_val:,}</div>
-                <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with kpi_col3:
         st.markdown(f"""
             <div class="kpi-card kpi-card-info">
                 <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
@@ -1180,12 +1163,33 @@ if st.session_state.get("procesado_exitoso", False):
             </div>
         """, unsafe_allow_html=True)
 
-    with kpi_col4:
+    # 2. Procesados con Éxito
+    with kpi_col2:
         st.markdown(f"""
             <div class="kpi-card kpi-card-success">
                 <div class="kpi-title kpi-title-success">✅ Procesados con Éxito</div>
                 <div class="kpi-value kpi-value-success">{exito_val:,}</div>
                 <div class="kpi-subtitle">Registros procesados correctamente sin novedades</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # 3. Ausencias Reales (CA)
+    with kpi_col3:
+        st.markdown(f"""
+            <div class="kpi-card kpi-card-danger">
+                <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
+                <div class="kpi-value kpi-value-danger">{ausencias_val:,}</div>
+                <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # 4. Marcaciones Erróneas (P)
+    with kpi_col4:
+        st.markdown(f"""
+            <div class="kpi-card kpi-card-warning">
+                <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
+                <div class="kpi-value kpi-value-warning">{erroneas_val:,}</div>
+                <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
             </div>
         """, unsafe_allow_html=True)
 
