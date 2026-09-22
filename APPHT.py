@@ -574,7 +574,7 @@ def procesar_plantilla_geovictoria(
     conteo_ausencias = 0
     conteo_p = 0
     registros_ausencias = []
-    registros_novedades = []  # Lista para la nueva tabla consolidada
+    registros_novedades = []
     marcaciones_ht_dict = {}
 
     hora_corte_nocturna = datetime.time(20, 0)
@@ -805,7 +805,6 @@ def procesar_plantilla_geovictoria(
         nombre_emp = f"{obtener_val_iloc(row, 0)} {obtener_val_iloc(row, 1)}".strip()
         f_str = fecha_ori.strftime('%Y-%m-%d') if fecha_ori and pd.notna(fecha_ori) else str(val_e)
 
-        # ── RECOLECCIÓN PARA LA NUEVA TABLA CONSOLIDAD DE NOVEDADES/AUSENTISMO ──
         if ca_val_clean and ca_val_clean != "":
             registros_novedades.append({
                 "Cédula": cedula_emp,
@@ -837,7 +836,7 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
-    # ── CREACIÓN DE LA HOJA "Novedades Ausentismo" (NUEVA HOJA SOLICITADA) ──
+    # ── CREACIÓN DE LA HOJA "Novedades Ausentismo" ──
     nombre_hoja_nov = "Novedades Ausentismo"
     if nombre_hoja_nov in wb.sheetnames:
         ws_nov = wb[nombre_hoja_nov]
@@ -1139,9 +1138,9 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         except Exception as e:
             st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
 
-# ── RENDERIZADO PERSISTENTE DE RESULTADOS, TABLA Y KPIS ──
+# ── RENDERIZADO PERSISTENTE DE RESULTADOS, TABLA INTERACTIVA Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Tabla 'Novedades Ausentismo' generada.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Tabla 'Novedades Ausentismo' lista.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
@@ -1150,11 +1149,31 @@ if st.session_state.get("procesado_exitoso", False):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ── MUESTRA DE LA TABLA SOLICITADA EN PANTALLA ──
+    # ── VISTA INTERACTIVA DE NOVEDADES CON FILTRO DE ALERTAS SOLICITADO ──
     if "df_novedades_res" in st.session_state and not st.session_state["df_novedades_res"].empty:
+        df_nov_full = st.session_state["df_novedades_res"]
+
         st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📋 Detalle de Novedades y Ausentismos</h3>", unsafe_allow_html=True)
+        
+        # Opciones dinámicas para el filtro de Tipo de Alerta
+        alertas_disponibles = ["Todas las Alertas"] + sorted(list(df_nov_full["Novedad Ausentismo"].dropna().unique()))
+
+        col_f1, _ = st.columns([1, 2])
+        with col_f1:
+            filtro_alerta_sel = st.selectbox(
+                "Filtrar por Tipo de Alerta / Novedad:",
+                options=alertas_disponibles,
+                index=0
+            )
+
+        # Aplicar filtro si no es "Todas las Alertas"
+        if filtro_alerta_sel != "Todas las Alertas":
+            df_nov_display = df_nov_full[df_nov_full["Novedad Ausentismo"] == filtro_alerta_sel]
+        else:
+            df_nov_display = df_nov_full
+
         st.dataframe(
-            st.session_state["df_novedades_res"],
+            df_nov_display,
             use_container_width=True,
             hide_index=True
         )
