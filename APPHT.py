@@ -108,6 +108,10 @@ st.markdown("""
             border-left: 6px solid #00529B;
             background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
         }
+        .kpi-card-success {
+            border-left: 6px solid #16a34a;
+            background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+        }
         .kpi-title {
             font-size: 13px;
             font-weight: 700;
@@ -118,6 +122,7 @@ st.markdown("""
         .kpi-title-danger { color: #991b1b; }
         .kpi-title-warning { color: #92400e; }
         .kpi-title-info { color: #00529B; }
+        .kpi-title-success { color: #14532d; }
 
         .kpi-value {
             font-size: 36px;
@@ -128,6 +133,7 @@ st.markdown("""
         .kpi-value-danger { color: #dc2626; }
         .kpi-value-warning { color: #d97706; }
         .kpi-value-info { color: #00529B; }
+        .kpi-value-success { color: #16a34a; }
 
         .kpi-subtitle {
             font-size: 12px;
@@ -1138,15 +1144,20 @@ if st.session_state.get("procesado_exitoso", False):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (PRIMERO EN PANTALLA) ──
+    # ── 1. RESUMEN EJECUTIVO DE AUDITORÍA (4 TARJETAS) ──
     st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
-    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+
+    total_proc = st.session_state["total_filas"]
+    ausencias_val = st.session_state["kpi_ausencias"]
+    erroneas_val = st.session_state["kpi_p"]
+    exito_val = max(0, total_proc - (ausencias_val + erroneas_val))
 
     with kpi_col1:
         st.markdown(f"""
             <div class="kpi-card kpi-card-danger">
                 <div class="kpi-title kpi-title-danger">🚨 Ausencias Reales (CA)</div>
-                <div class="kpi-value kpi-value-danger">{st.session_state["kpi_ausencias"]:,}</div>
+                <div class="kpi-value kpi-value-danger">{ausencias_val:,}</div>
                 <div class="kpi-subtitle">Registros clasificados como Ausencia en Columna CA</div>
             </div>
         """, unsafe_allow_html=True)
@@ -1155,7 +1166,7 @@ if st.session_state.get("procesado_exitoso", False):
         st.markdown(f"""
             <div class="kpi-card kpi-card-warning">
                 <div class="kpi-title kpi-title-warning">⚠️ Marcaciones Erróneas (P)</div>
-                <div class="kpi-value kpi-value-warning">{st.session_state["kpi_p"]:,}</div>
+                <div class="kpi-value kpi-value-warning">{erroneas_val:,}</div>
                 <div class="kpi-subtitle">Registros marcados con P en Columna CA</div>
             </div>
         """, unsafe_allow_html=True)
@@ -1164,8 +1175,17 @@ if st.session_state.get("procesado_exitoso", False):
         st.markdown(f"""
             <div class="kpi-card kpi-card-info">
                 <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
-                <div class="kpi-value kpi-value-info">{st.session_state["total_filas"]:,}</div>
+                <div class="kpi-value kpi-value-info">{total_proc:,}</div>
                 <div class="kpi-subtitle">Filas evaluadas en el periodo</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with kpi_col4:
+        st.markdown(f"""
+            <div class="kpi-card kpi-card-success">
+                <div class="kpi-title kpi-title-success">✅ Procesados con Éxito</div>
+                <div class="kpi-value kpi-value-success">{exito_val:,}</div>
+                <div class="kpi-subtitle">Registros procesados correctamente sin novedades</div>
             </div>
         """, unsafe_allow_html=True)
 
