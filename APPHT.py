@@ -973,7 +973,7 @@ with st.expander("📁 Bases de datos", expanded=True):
         file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"])
         file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"])
         file_novasoft = st.file_uploader("3. BBDD Ausentismos Novasoft (.xlsx)", type=["xlsx"])
-        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"])
+        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones SPN (.xlsx)", type=["xlsx"])
 
         status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
 
