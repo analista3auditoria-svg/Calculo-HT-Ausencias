@@ -310,8 +310,8 @@ st.markdown("""
         <div class="header-brand-content">
             <img src="https://cdn1.totalcommerce.cloud/casalimpia/web_content/assets/logo-casa-limpia.svg" alt="Casalimpia Logo" />
             <div class="title-text">
-                <h1>Modelo Auditoría Trabajo Suplementario</h1>
-                <p>Ausentismos vs Novasoft</p>
+                <h1>Auditor TS & Módulo GeoVictoria</h1>
+                <p>Plataforma Corporativa de Procesamiento y Auditoría de Tiempos y Ausentismos</p>
             </div>
         </div>
     </div>
@@ -574,6 +574,7 @@ def procesar_plantilla_geovictoria(
     conteo_ausencias = 0
     conteo_p = 0
     registros_ausencias = []
+    registros_novedades = []  # Lista para la nueva tabla consolidada
     marcaciones_ht_dict = {}
 
     hora_corte_nocturna = datetime.time(20, 0)
@@ -801,14 +802,24 @@ def procesar_plantilla_geovictoria(
             marcaciones_ht_dict[(cedula_emp, fecha_ori.date())] = f'=IFERROR(ROUND(BC{i}*24,1),"")'
 
         ca_val_clean = str(val_ca_aus_real).strip()
+        nombre_emp = f"{obtener_val_iloc(row, 0)} {obtener_val_iloc(row, 1)}".strip()
+        f_str = fecha_ori.strftime('%Y-%m-%d') if fecha_ori and pd.notna(fecha_ori) else str(val_e)
+
+        # ── RECOLECCIÓN PARA LA NUEVA TABLA CONSOLIDAD DE NOVEDADES/AUSENTISMO ──
+        if ca_val_clean and ca_val_clean != "":
+            registros_novedades.append({
+                "Cédula": cedula_emp,
+                "Nombre": nombre_emp,
+                "Fecha": f_str,
+                "Novedad Ausentismo": ca_val_clean
+            })
+
         if ca_val_clean.lower() == "ausencia":
             celda_ca.fill = fill_ausencia_rojo
             celda_ca.font = font_ausencia_blanco
             celda_ca.alignment = Alignment(horizontal="center", vertical="center")
             conteo_ausencias += 1
 
-            nombre_emp = obtener_val_iloc(row, 1)
-            f_str = fecha_ori.strftime('%d/%m/%Y') if fecha_ori and pd.notna(fecha_ori) else str(val_e)
             registros_ausencias.append({
                 "Identificador": cedula_emp,
                 "Nombres": nombre_emp,
@@ -826,6 +837,41 @@ def procesar_plantilla_geovictoria(
         progress_bar.progress(pct)
         status_text.caption(f"⚡ Procesando fila {idx + 1} de {total_filas} ({int(pct*100)}%)")
 
+    # ── CREACIÓN DE LA HOJA "Novedades Ausentismo" (NUEVA HOJA SOLICITADA) ──
+    nombre_hoja_nov = "Novedades Ausentismo"
+    if nombre_hoja_nov in wb.sheetnames:
+        ws_nov = wb[nombre_hoja_nov]
+        ws_nov.delete_rows(1, ws_nov.max_row + 1)
+    else:
+        ws_nov = wb.create_sheet(title=nombre_hoja_nov)
+    
+    ws_nov.views.sheetView[0].showGridLines = True
+
+    encabezados_nov = ["Cédula", "Nombre", "Fecha", "Novedad Ausentismo"]
+    bg_azul_header = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
+    font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+    for col_idx, text_h in enumerate(encabezados_nov, start=1):
+        c = ws_nov.cell(row=1, column=col_idx, value=text_h)
+        c.fill = bg_azul_header
+        c.font = font_header
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = thin_border
+
+    for row_idx, r_nov in enumerate(registros_novedades, start=2):
+        c1 = ws_nov.cell(row=row_idx, column=1, value=r_nov["Cédula"])
+        c2 = ws_nov.cell(row=row_idx, column=2, value=r_nov["Nombre"])
+        c3 = ws_nov.cell(row=row_idx, column=3, value=r_nov["Fecha"])
+        c4 = ws_nov.cell(row=row_idx, column=4, value=r_nov["Novedad Ausentismo"])
+
+        c1.alignment = Alignment(horizontal="center", vertical="center")
+        c2.alignment = Alignment(horizontal="left", vertical="center")
+        c3.alignment = Alignment(horizontal="center", vertical="center")
+        c4.alignment = Alignment(horizontal="center", vertical="center")
+
+        for c_tmp in [c1, c2, c3, c4]:
+            c_tmp.border = thin_border
+
     # ── CREACIÓN DE LA HOJA "Ausencias" ──
     if "Ausencias" in wb.sheetnames:
         ws_aus = wb["Ausencias"]
@@ -835,20 +881,18 @@ def procesar_plantilla_geovictoria(
     
     ws_aus.views.sheetView[0].showGridLines = True
 
-    bg_azul_header = PatternFill(start_color="1B5E82", end_color="1B5E82", fill_type="solid")
-    bg_verde_header = PatternFill(start_color="1E4620", end_color="1E4620", fill_type="solid")
-    bg_azul_dark = PatternFill(start_color="00529B", end_color="00529B", fill_type="solid")
-    font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-
     ws_aus["A1"] = "Identificador"
     ws_aus["B1"] = "Nombres"
     ws_aus["C1"] = "Fecha Ori"
     ws_aus["D1"] = "Dia"
     ws_aus["E1"] = "Ausentismo Real"
 
+    bg_azul_header_aus = PatternFill(start_color="1B5E82", end_color="1B5E82", fill_type="solid")
+    bg_verde_header = PatternFill(start_color="1E4620", end_color="1E4620", fill_type="solid")
+
     for col in ["A1", "B1", "C1", "D1"]:
         c = ws_aus[col]
-        c.fill = bg_azul_header
+        c.fill = bg_azul_header_aus
         c.font = font_header
         c.alignment = Alignment(horizontal="center", vertical="center")
         c.border = thin_border
@@ -880,7 +924,7 @@ def procesar_plantilla_geovictoria(
 
     for col in ["H1", "I1"]:
         c = ws_aus[col]
-        c.fill = bg_azul_dark
+        c.fill = bg_azul_header
         c.font = font_header
         c.alignment = Alignment(horizontal="center", vertical="center")
         c.border = thin_border
@@ -960,7 +1004,7 @@ def procesar_plantilla_geovictoria(
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
-    return output, conteo_ausencias, conteo_p, total_filas
+    return output, conteo_ausencias, conteo_p, total_filas, pd.DataFrame(registros_novedades)
 
 
 # ─── INTERFAZ DE USUARIO ───────────────────────────────────────────────────
@@ -973,7 +1017,7 @@ with st.expander("📁 Bases de datos", expanded=True):
         file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"])
         file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"])
         file_novasoft = st.file_uploader("3. BBDD Ausentismos Novasoft (.xlsx)", type=["xlsx"])
-        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones SPN (.xlsx)", type=["xlsx"])
+        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"])
 
         status_e = '<span class="file-status-ok">✔ Principal Cargado</span>' if file_entrada else '<span class="file-status-pending">Pendiente Marcaciones</span>'
 
@@ -1072,8 +1116,8 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando marcaciones y extrayendo datos con la lista de Centros de Costos..."):
-                excel_salida, kpi_ausencias, kpi_p, total_filas = procesar_plantilla_geovictoria(
+            with st.spinner("Procesando marcaciones y generando reporte consolidado de Novedades de Ausentismo..."):
+                excel_salida, kpi_ausencias, kpi_p, total_filas, df_novedades_res = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
                     file_novasoft=file_novasoft, sheet_novasoft=hoja_novasoft,
@@ -1090,13 +1134,14 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
             st.session_state["kpi_ausencias"] = kpi_ausencias
             st.session_state["kpi_p"] = kpi_p
             st.session_state["total_filas"] = total_filas
+            st.session_state["df_novedades_res"] = df_novedades_res
 
         except Exception as e:
             st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
 
-# ── RENDERIZADO PERSISTENTE DE RESULTADOS Y KPIS ──
+# ── RENDERIZADO PERSISTENTE DE RESULTADOS, TABLA Y KPIS ──
 if st.session_state.get("procesado_exitoso", False):
-    st.success("✨ ¡Auditoría finalizada con éxito! Nombres de las bases de datos actualizados.")
+    st.success("✨ ¡Auditoría finalizada con éxito! Tabla 'Novedades Ausentismo' generada.")
     
     st.download_button(
         label="📥 Descargar Resultado Calculado (Excel)",
@@ -1104,6 +1149,15 @@ if st.session_state.get("procesado_exitoso", False):
         file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+    # ── MUESTRA DE LA TABLA SOLICITADA EN PANTALLA ──
+    if "df_novedades_res" in st.session_state and not st.session_state["df_novedades_res"].empty:
+        st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📋 Detalle de Novedades y Ausentismos</h3>", unsafe_allow_html=True)
+        st.dataframe(
+            st.session_state["df_novedades_res"],
+            use_container_width=True,
+            hide_index=True
+        )
 
     st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
