@@ -1374,6 +1374,16 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
             s2 = str(v2).strip().upper() if v2 is not None else ""
             return s1 != s2
 
+    # Inicialización segura en session_state para evitar KeyError
+    if "procesado_m2" not in st.session_state:
+        st.session_state.procesado_m2 = False
+    if "kpi_total_proc_m2" not in st.session_state:
+        st.session_state.kpi_total_proc_m2 = 0
+    if "kpi_validos_m2" not in st.session_state:
+        st.session_state.kpi_validos_m2 = 0
+    if "kpi_revisar_m2" not in st.session_state:
+        st.session_state.kpi_revisar_m2 = 0
+
     st.header("📁 1. Carga de Archivos Base")
 
     col_file1, col_file2, col_file3 = st.columns(3)
@@ -1404,14 +1414,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
         
         st.header("📅 2. Parámetros de Filtrado y Fechas")
         fecha_inicio_input = st.date_input("Fecha Inicial de Semanas para Análisis de Compensatorios", value=datetime.date(2026, 2, 15))
-        
-        if "procesado_m2" not in st.session_state:
-            st.session_state.procesado_m2 = False
-            st.session_state.output_bytes_m2 = None
-            st.session_state.htcc_bytes_m2 = None
-            st.session_state.kpi_total_proc_m2 = 0
-            st.session_state.kpi_validos_m2 = 0
-            st.session_state.kpi_revisar_m2 = 0
 
         if st.button("🚀 Procesar Información y Generar Análisis", type="primary"):
             with st.spinner("Procesando datos y estructurando archivos de Excel..."):
@@ -2069,7 +2071,7 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
                     ws_comp.freeze_panes, ws_comp.auto_filter.ref = f"A{FILA_ENCABEZADO + 1}", f"A{FILA_ENCABEZADO}:{get_column_letter(ws_comp.max_column)}{ws_comp.max_row}"
 
-                    # ── CÁLCULO DE KPIS BASADOS EN LA HOJA 'Comparaciones' DE HTCC ──
+                    # ── CÁLCULO SEGURO DE KPIS REFRESCANDO COLUMNAS ──
                     total_proc_nomina = 0
                     validos_count = 0
                     revisar_count = 0
@@ -2078,12 +2080,11 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     col_dif_comp_idx = mapa_cols_ht_a_comp.get(COL_DIF_IDX)
 
                     for r_comp in range(FILA_ENCABEZADO + 1, ws_comp.max_row + 1):
-                        val_nom_oper = str(ws_comp.cell(row=r_comp, column=col_nom_oper_idx).value or "").strip().lower()
-                        if val_nom_oper == "nomina":
+                        cell_tipo = ws_comp.cell(row=r_comp, column=col_nom_oper_idx).value
+                        if cell_tipo and str(cell_tipo).strip().lower() == "nomina":
                             total_proc_nomina += 1
                             val_dif = ws_comp.cell(row=r_comp, column=col_dif_comp_idx).value
                             
-                            # Evaluar la celda Diferencia de Nomina
                             es_cero = False
                             if val_dif is not None:
                                 try:
@@ -2249,7 +2250,7 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error inesperado al procesar: {e}")
 
-        # ── DESCARGA DE ARCHIVOS Y TARJETAS KPIS DEL MÓDULO 2 ──
+        # ── DESCARGA DE ARCHIVOS Y RENDERIZADO DE KPIS ROBUSTO EN EL MÓDULO 2 ──
         if st.session_state.get("procesado_m2", False):
             st.success("🎉 ¡Reporte y Consolidación Multi-Periodo procesados exitosamente!")
             
@@ -2271,30 +2272,43 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     key="d_btn_m2_2"
                 )
 
-            # ── DESPLIEGUE DE TARJETAS KPIS DEL MÓDULO 2 ──
+            # Extraer variables con respaldo seguro
+            val_total_proc = st.session_state.get("kpi_total_proc_m2", 0)
+            val_validos = st.session_state.get("kpi_validos_m2", 0)
+            val_revisar = st.session_state.get("kpi_revisar_m2", 0)
+
             st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría de Nómina</h3>", unsafe_allow_html=True)
             kpi_m2_1, kpi_m2_2, kpi_m2_3 = st.columns(3)
 
             with kpi_m2_1:
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class="kpi-card kpi-card-info">
                         <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
-                        <div class="kpi-value kpi-value-info">{st.session_state.kpi_total_proc_m2:,}</div>
+                        <div class="kpi-value kpi-value-info">{val_total_proc:,}</div>
                     </div>
-                """, unsafe_allow_html=True)
+                    """, 
+                    unsafe_allow_html=True
+                )
 
             with kpi_m2_2:
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class="kpi-card kpi-card-success">
                         <div class="kpi-title kpi-title-success">✅ Registros Válidos</div>
-                        <div class="kpi-value kpi-value-success">{st.session_state.kpi_validos_m2:,}</div>
+                        <div class="kpi-value kpi-value-success">{val_validos:,}</div>
                     </div>
-                """, unsafe_allow_html=True)
+                    """, 
+                    unsafe_allow_html=True
+                )
 
             with kpi_m2_3:
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                     <div class="kpi-card kpi-card-warning">
                         <div class="kpi-title kpi-title-warning">⚠️ Registros a Revisar</div>
-                        <div class="kpi-value kpi-value-warning">{st.session_state.kpi_revisar_m2:,}</div>
+                        <div class="kpi-value kpi-value-warning">{val_revisar:,}</div>
                     </div>
-                """, unsafe_allow_html=True)
+                    """, 
+                    unsafe_allow_html=True
+                )
