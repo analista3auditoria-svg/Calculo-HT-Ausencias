@@ -42,6 +42,7 @@ st.markdown("""
         [data-testid="stSidebar"] {
             display: block !important;
             visibility: visible !important;
+            background-color: #f8fafc !important;
         }
         [data-testid="stSidebarNav"] {
             display: block !important;
@@ -143,107 +144,23 @@ st.markdown("""
         .kpi-value-info { color: #00529B; }
         .kpi-value-success { color: #16a34a; }
 
-        [data-testid="stFileUploader"] {
-            padding: 0px;
-            margin-bottom: 12px;
+        /* Estilizado avanzado para Sliders corporativos */
+        div[data-baseweb="slider"] {
+            margin-top: 10px;
+            margin-bottom: 10px;
         }
-        [data-testid="stFileUploaderDropzone"] {
-            padding: 10px 14px !important;
-            border: 1.5px dashed #cbd5e1 !important;
-            border-radius: 10px !important;
-            background-color: #f8fafc !important;
-            display: flex !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            gap: 12px !important;
-            min-height: 46px !important;
-            transition: all 0.2s ease;
-            position: relative;
+        div[data-baseweb="slider"] > div {
+            background-color: #e2e8f0 !important;
         }
-        [data-testid="stFileUploaderDropzone"]:hover {
-            background-color: #f0f7ff !important;
-            border-color: #00529B !important;
-        }
-        [data-testid="stFileUploaderDropzone"] section,
-        [data-testid="stFileUploaderDropzone"] small,
-        [data-testid="stFileUploaderDropzone"] svg {
-            display: none !important;
-        }
-        [data-testid="stFileUploaderDropzone"]::before {
-            content: "📄 Cargar" !important;
-            display: inline-block !important;
+        div[role="slider"] {
             background-color: #00529B !important;
-            color: #ffffff !important;
-            border: none !important;
-            border-radius: 6px !important;
-            padding: 5px 12px !important;
-            font-size: 12.5px !important;
-            font-weight: 600 !important;
-            cursor: pointer !important;
-        }
-        [data-testid="stFileUploaderDropzone"] button {
-            display: none !important;
+            border: 3px solid #ffffff !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+            width: 20px !important;
+            height: 20px !important;
         }
 
-        /* Cuadros de archivos cargados en color verde esmeralda */
-        [data-testid="stFileUploaderFileData"] > div:first-child,
-        [data-testid="stFileUploaderFileData"] svg,
-        div[data-testid="stFileUploaderFileData"] > span:first-child,
-        [data-testid="stFileUploaderFileData"] [data-testid="stFileUploaderDeleteBtn"] ~ div,
-        [data-testid="stFileUploaderFileData"] > div {
-            background-color: #059669 !important;
-            color: #ffffff !important;
-            border-radius: 8px !important;
-            fill: #ffffff !important;
-        }
-
-        [data-testid="stFileUploaderFileData"] > div:first-child::after {
-            content: "✓" !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            background-color: #059669 !important;
-            color: #ffffff !important;
-            font-weight: 800 !important;
-            font-size: 16px !important;
-            width: 32px !important;
-            height: 32px !important;
-            border-radius: 8px !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-        }
-
-        [data-testid="stFileUploaderFileData"] svg {
-            display: none !important;
-        }
-
-        div[data-baseweb="popover"],
-        div[data-baseweb="menu"] {
-            resize: both !important;
-            overflow: auto !important;
-            min-width: 380px !important;
-            min-height: 200px !important;
-            max-width: 90vw !important;
-            max-height: 80vh !important;
-        }
-
-        ul[data-testid="stSelectboxVirtualDropdown"] {
-            resize: both !important;
-            overflow: auto !important;
-            min-width: 380px !important;
-            width: 100% !important;
-        }
-
-        ul[data-testid="stSelectboxVirtualDropdown"] li {
-            white-space: normal !important;
-            word-break: break-word !important;
-            padding-top: 8px !important;
-            padding-bottom: 8px !important;
-            line-height: 1.3 !important;
-        }
-
+        /* Botones y Uploader */
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -803,7 +720,7 @@ def procesar_plantilla_geovictoria(
     contrato_principal,
     fecha_ini_sup, fecha_fin_sup,
     file_nomina,
-    fecha_ini_nova_param, fecha_fin_nova_param
+    rango_fechas_nova_slider
 ):
     df_marc_raw = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
@@ -1449,13 +1366,11 @@ def procesar_plantilla_geovictoria(
     wb.save(output)
     output.seek(0)
     
-    # ── SEGUNDA FASE: CONSUMIR API NOVASOFT APLICANDO LA SUMA Y RESTA DE DÍAS ──
+    # ── SEGUNDA FASE: CONSUMIR API NOVASOFT APLICANDO EL RANGO DEL SLICER ──
     excel_novasoft_api = None
     if not file_novasoft:
-        f_ini_nova_calc = fecha_ini_nova_param - datetime.timedelta(days=dias_restar_nova)
-        f_fin_nova_calc = fecha_fin_nova_param + datetime.timedelta(days=dias_sumar_nova)
-        f_ini_str = f_ini_nova_calc.strftime("%Y-%m-%d")
-        f_fin_str = f_fin_nova_calc.strftime("%Y-%m-%d")
+        f_ini_str = rango_fechas_nova_slider[0].strftime("%Y-%m-%d")
+        f_fin_str = rango_fechas_nova_slider[1].strftime("%Y-%m-%d")
         excel_novasoft_api = consumir_y_generar_excel_novasoft(f_ini_str, f_fin_str)
 
     # ── TERCERA FASE: SI SE DISPONE DE PLANILLA DE NÓMINA (BBDD 8) PROCESAR HTCC ──
@@ -1613,25 +1528,28 @@ st.sidebar.markdown("### 📅 Filtro Rango de Fechas Auditoría General")
 fecha_ini_sup = st.sidebar.date_input("Fecha Inicial Auditoría", value=datetime.date(2026, 9, 1))
 fecha_fin_sup = st.sidebar.date_input("Fecha Final Auditoría", value=datetime.date(2026, 9, 10))
 
-# ── BARRAS DESLIZANTES (SLIDERS) PARA SUMAR/RESTAR DÍAS EN API NOVASOFT ──
+# ── SLICER PROFESIONAL TIPO BARRA DESLIZANTE PARA API NOVASOFT ──
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ☁️ Filtro Rango de Fechas API Novasoft")
-fecha_ini_nova = st.sidebar.date_input("Fecha Inicial Novasoft API", value=datetime.date(2026, 9, 1))
-dias_restar_nova = st.sidebar.slider("Días a restar a la Fecha Inicial", min_value=0, max_value=60, value=0, step=1)
 
-fecha_fin_nova = st.sidebar.date_input("Fecha Final Novasoft API", value=datetime.date(2026, 9, 10))
-dias_sumar_nova = st.sidebar.slider("Días a sumar a la Fecha Final", min_value=0, max_value=60, value=0, step=1)
+min_date_limit = datetime.date(2025, 1, 1)
+max_date_limit = datetime.date(2027, 12, 31)
 
-# Cálculo dinámico visible de rango aplicado
-f_ini_nova_vista = fecha_ini_nova - datetime.timedelta(days=dias_restar_nova)
-f_fin_nova_vista = fecha_fin_nova + datetime.timedelta(days=dias_sumar_nova)
-st.sidebar.caption(f"🗓️ **Rango Efectivo Novasoft:** `{f_ini_nova_vista.strftime('%Y-%m-%d')}` al `{f_fin_nova_vista.strftime('%Y-%m-%d')}`")
+rango_fechas_nova_slider = st.sidebar.slider(
+    "Selecciona Rango de Fechas (API Novasoft):",
+    min_value=min_date_limit,
+    max_value=max_date_limit,
+    value=(datetime.date(2026, 9, 1), datetime.date(2026, 9, 15)),
+    format="YYYY/MM/DD"
+)
+
+st.sidebar.caption(f"🗓️ **Rango Seleccionado:** `{rango_fechas_nova_slider[0].strftime('%Y-%m-%d')}` al `{rango_fechas_nova_slider[1].strftime('%Y-%m-%d')}`")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Desliza las barras para ajustar la tolerancia de días en Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
+    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Ajusta el Slicer de fechas para Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1690,8 +1608,8 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal,
                     fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup,
                     file_nomina=file_nomina,
-                    fecha_ini_nova_param=fecha_ini_nova,
-                    fecha_fin_nova_param=fecha_fin_nova
+                    fecha_ini_nova_param=rango_fechas_nova_slider[0],
+                    fecha_fin_nova_param=rango_fechas_nova_slider[1]
                 )
 
             st.session_state["procesado_exitoso"] = True
