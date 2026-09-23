@@ -1050,11 +1050,11 @@ if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
     st.sidebar.markdown("""
     <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
         <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-        <small style="color: #475569;">1. Carga el archivo <b>6. BBDD Historia laboral de empleados</b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+        <small style="color: #475569;">1. Carga el archivo <b></b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
+    with st.expander("🛠️ Configuración"):
         st.caption("Solo modifica estos campos si los libros de Excel tienen nombres de hoja diferentes a los estándar.")
         c_a, c_b = st.columns(2)
         with c_a:
@@ -1077,7 +1077,7 @@ if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
             st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
         else:
             try:
-                with st.spinner("Procesando marcaciones y generando reporte consolidado de Novedades de Ausentismo..."):
+                with st.spinner("Procesando información..."):
                     excel_salida, kpi_ausencias, kpi_p, total_filas, df_novedades_res = procesar_plantilla_geovictoria(
                         file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                         file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1104,13 +1104,13 @@ if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
         st.success("✨ ¡Auditoría finalizada con éxito!")
         
         st.download_button(
-            label="📥 Descargar Resultado Calculado Completo (Excel Completo)",
+            label="📥 Descargar ",
             data=st.session_state["excel_salida"],
             file_name="Calculado_GeoVictoria_Casalimpia.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría</h3>", unsafe_allow_html=True)
+        st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen</h3>", unsafe_allow_html=True)
         kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
         total_proc = st.session_state["total_filas"]
