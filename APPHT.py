@@ -1926,6 +1926,11 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
                     fila_comp = FILA_ENCABEZADO + 1
 
+                    # Mapeo y variables para conteo preciso de KPIs de la columna Diferencia
+                    total_proc_nomina = 0
+                    validos_count = 0
+                    revisar_count = 0
+
                     for (periodo, id_str, conc_libro3), fila_excel in indice_filas.items():
                         nombre_emp = ws_htcc.cell(row=fila_excel, column=col_nombre_libro3).value if col_nombre_libro3 else mapa_nombres_ht.get(id_str, "")
 
@@ -2067,28 +2072,35 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
                         ws_comp.column_dimensions[get_column_letter(col_obs_idx)].width = 35
 
+                        # ── RECALCULAR Y EVALUAR LA DIFERENCIA (CANTIDAD - TOTAL) EN MEMORIA PARA CADA FILA NOMINA ──
+                        total_proc_nomina += 1
+                        val_cant_nom = ws_htcc.cell(row=fila_excel, column=col_cantidad_libro3).value if col_cantidad_libro3 else 0
+                        cols_per_act = cols_por_periodo.get(periodo.upper(), [])
+                        
+                        suma_fechas_nom = 0.0
+                        for c_f_idx in cols_per_act:
+                            v_f = ws_htcc.cell(row=fila_excel, column=c_f_idx).value
+                            try:
+                                if v_f is not None:
+                                    suma_fechas_nom += float(v_f)
+                            except (ValueError, TypeError):
+                                pass
+
+                        try:
+                            val_cant_num = float(val_cant_nom) if val_cant_nom is not None else 0.0
+                        except (ValueError, TypeError):
+                            val_cant_num = 0.0
+
+                        dif_calculada = round(val_cant_num - suma_fechas_nom, 2)
+
+                        if abs(dif_calculada) < 0.01:
+                            validos_count += 1
+                        else:
+                            revisar_count += 1
+
                         fila_comp += 2
 
                     ws_comp.freeze_panes, ws_comp.auto_filter.ref = f"A{FILA_ENCABEZADO + 1}", f"A{FILA_ENCABEZADO}:{get_column_letter(ws_comp.max_column)}{ws_comp.max_row}"
-
-                    # ── CÁLCULO DE KPIS EVALUANDO LA OBSERVACIÓN "Sin diferencias" ──
-                    total_proc_nomina = 0
-                    validos_count = 0
-                    revisar_count = 0
-
-                    col_nom_oper_idx = mapa_cols_ht_a_comp.get('NOM/Oper')
-
-                    for r_comp in range(FILA_ENCABEZADO + 1, ws_comp.max_row + 1):
-                        cell_tipo = ws_comp.cell(row=r_comp, column=col_nom_oper_idx).value
-                        if cell_tipo and str(cell_tipo).strip().lower() == "nomina":
-                            total_proc_nomina += 1
-                            txt_obs = str(ws_comp.cell(row=r_comp, column=col_obs_idx).value or "").strip()
-                            
-                            # Si dice "Sin diferencias", la celda Diferencia es 0.00
-                            if txt_obs == "Sin diferencias":
-                                validos_count += 1
-                            else:
-                                revisar_count += 1
 
                     htcc_buffer = io.BytesIO()
                     wb_htcc.save(htcc_buffer)
