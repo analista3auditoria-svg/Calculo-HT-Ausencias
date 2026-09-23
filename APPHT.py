@@ -576,6 +576,57 @@ def consumir_y_generar_excel_novasoft(fec_ini_str, fec_fin_str):
     return output_novasoft
 
 
+# ─── FUNCION DE CONSULTA API HISTORIA LABORAL DE EMPLEADOS ────────────────
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def consumir_y_generar_excel_historia_laboral():
+    """Consulta la API HistoriaLaboralEmpleados de Novasoft y genera el Excel en memoria"""
+    token = obtener_token_novasoft()
+    
+    fec_ini = "2020-01-01"
+    fec_fin = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    payload = {
+        "codEmp": "%", "codCia": "%", "codSuc": "%", "codCco": "%",
+        "codCl1": "%", "codCl2": "%", "codCl3": "%",
+        "fecIni": fec_ini, "fecFin": fec_fin, "indFec": "0"
+    }
+
+    data_historia = realizar_peticion_novasoft("NOM/HistoriaLaboralEmpleados", payload, token)
+    
+    registros_consolidados = []
+    if isinstance(data_historia, list):
+        for item in data_historia:
+            registros_consolidados.append({
+                "Cedula": item.get("codEmp", ""),
+                "Nombre": item.get("nomEmp", ""),
+                "Centro de costos": item.get("nomCco", ""),
+                "Fecha inicio": item.get("fecIni", ""),
+                "Fecha final": item.get("fecFin", ""),
+                "Frente de trabajo": item.get("nomCl4", "")
+            })
+
+    df_hl = pd.DataFrame(registros_consolidados)
+    if not df_hl.empty:
+        columnas_orden = ["Cedula", "Nombre", "Centro de costos", "Fecha inicio", "Fecha final", "Frente de trabajo"]
+        df_hl = df_hl[columnas_orden]
+
+    output_hl = io.BytesIO()
+    with pd.ExcelWriter(output_hl, engine='openpyxl') as writer:
+        df_hl.to_excel(writer, index=False, sheet_name="Hoja 1")
+        
+        # Pestaña "data" con centros de costo únicos para el selectbox
+        if not df_hl.empty and "Centro de costos" in df_hl.columns:
+            cc_unicos = df_hl["Centro de costos"].dropna().astype(str).str.strip().unique()
+            df_cc = pd.DataFrame({"Centro de costos": sorted(list(cc_unicos))})
+            df_cc.to_excel(writer, index=False, sheet_name="data")
+        else:
+            pd.DataFrame({"Centro de costos": ["FUNDACION HOSPITAL DE LA MISERICORDIA"]}).to_excel(writer, index=False, sheet_name="data")
+
+    output_hl.seek(0)
+    return output_hl
+
+
 # ─── FUNCIONES AUXILIARES DE PROCESAMIENTO GENERAL ───────────────────────
 
 def obtener_val_iloc(row, index_col):
@@ -1428,7 +1479,7 @@ def procesar_plantilla_geovictoria(
                 if col_nombre_libro3 and cell.column == col_nombre_libro3: nom_val = str(cell.value).strip() if cell.value else None
                 if cell.column == col_concepto_libro3: conc_val = str(cell.value).strip().lower() if cell.value else None
             if periodo_val and id_val and conc_val and id_val not in ("None", "nan", ""):
-                indice_filas[(periodo_val, id_val, conc_val)] = fila_num
+                indice_filas[(periodo_val, id_str, conc_val)] = fila_num
                 if id_val and nom_val:
                     mapa_nombres_ht[id_val] = nom_val
 
@@ -1475,7 +1526,10 @@ def procesar_plantilla_geovictoria(
     return output, conteo_ausencias, conteo_p, total_filas, pd.DataFrame(registros_novedades), htcc_bytes, kpi_total_proc_m2, kpi_validos_m2, kpi_revisar_m2, excel_novasoft_api
 
 
-# ─── CARGA DE ARCHIVOS BBDD DE LA PLATAFORMA ─────────────────────────────
+# ─── CARGA DE ARCHIVOS BBDD DE LA PLATAFORMA Y EXTRACCIÓN HISTORIA LABORAL ───
+
+# 1. Extracción e integración en memoria de la BBDD Historia Laboral (#6) vía API
+file_historial_api = consumir_y_generar_excel_historia_laboral()
 
 with st.expander("📁 Bases de datos", expanded=True):
     col1, col2 = st.columns(2, gap="large")
@@ -1486,29 +1540,23 @@ with st.expander("📁 Bases de datos", expanded=True):
 
     with col2:
         file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"], help="BD maestro del personal de la compañía")
-        file_historial = st.file_uploader("6. BBDD Historia laboral de empleados (.xlsx)", type=["xlsx"], help="BD descargada del SIC")
         file_nomina = st.file_uploader("8. Nómina (.xlsx)", type=["xlsx"], help="Plantilla de Nómina para consolidación HTCC")
 
+# Poblado dinámico del selector de Centros de Costo desde la hoja 'data' generada por la API de Historia Laboral
 lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]
 
-if file_historial:
+if file_historial_api:
     try:
-        excel_hist_temp = pd.ExcelFile(file_historial)
-        target_data_sheet = None
-        for sheet_name in excel_hist_temp.sheet_names:
-            if sheet_name.strip().lower() == "data":
-                target_data_sheet = sheet_name
-                break
-        
-        if target_data_sheet:
-            df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
+        excel_hist_temp = pd.ExcelFile(file_historial_api)
+        if "data" in excel_hist_temp.sheet_names:
+            df_cc_data = pd.read_excel(file_historial_api, sheet_name="data")
             if not df_cc_data.empty:
                 centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
                 centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
                 if centros_extraidos:
                     lista_cc = sorted(list(set(centros_extraidos)))
-    except Exception as e:
-        st.warning(f"⚠️ No se pudo leer la hoja 'data' del Historial Laboral: {e}")
+    except Exception:
+        pass
 
 st.sidebar.markdown("## ⚙️ Parámetros de Configuración")
 
@@ -1583,7 +1631,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, ingresa la contraseña para conectarse al servidor SQL en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Conectando a SQL Server, API Novasoft y procesando auditoría unificada..."):
+            with st.spinner("Conectando a SQL Server, APIs Novasoft y procesando auditoría unificada..."):
                 f_ini_sql = fecha_ini_sup.strftime("%Y-%m-%d")
                 f_fin_sql = fecha_fin_sup.strftime("%Y-%m-%d")
                 
@@ -1605,7 +1653,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     file_novasoft=None, sheet_novasoft=hoja_novasoft,
                     file_sic=file_sql_sic, sheet_sic="Datos",
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
-                    file_historial=file_historial, sheet_historial=hoja_historial,
+                    file_historial=file_historial_api, sheet_historial="Hoja 1",
                     file_supernumerario=file_sql_supernumerario, sheet_supernumerario="Base",
                     contrato_principal=contrato_principal,
                     fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup,
