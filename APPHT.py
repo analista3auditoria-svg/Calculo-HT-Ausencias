@@ -280,8 +280,8 @@ st.markdown("""
         <div class="header-brand-content">
             <img src="https://cdn1.totalcommerce.cloud/casalimpia/web_content/assets/logo-casa-limpia.svg" alt="Casalimpia Logo" />
             <div class="title-text">
-                <h1>Auditor TS Corporativo</h1>
-                <p>Plataforma Integral de Procesamiento, Auditoría de Tiempos y Análisis de Compensatorios</p>
+                <h1>Modelo de Auditoria T.S.</h1>
+                <p>Auditoría de Tiempos y Análisis de Compensatorios</p>
             </div>
         </div>
     </div>
