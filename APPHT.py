@@ -1050,7 +1050,7 @@ if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
     st.sidebar.markdown("""
     <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
         <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-        <small style="color: #475569;">1. Carga el archivo <b></b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+        <small style="color: #475569;">1. Carga el archivo <b>6. BBDD Historia laboral de empleados</b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1200,7 +1200,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
     st.markdown("<h2 style='color: #00529B; font-weight: 700;'>📊 Módulo Auditoría TS & Compensatorios</h2>", unsafe_allow_html=True)
 
-    # ── Configuración Inicial Interna del Módulo 2 ──
     MAPA_ausencias = {
         "ninguno":                     None,
         "ausencia":                  "A",
@@ -1375,7 +1374,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
             s2 = str(v2).strip().upper() if v2 is not None else ""
             return s1 != s2
 
-    # ── Paso 1: Carga de Archivos ──
     st.header("📁 1. Carga de Archivos Base")
 
     col_file1, col_file2, col_file3 = st.columns(3)
@@ -1411,6 +1409,9 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
             st.session_state.procesado_m2 = False
             st.session_state.output_bytes_m2 = None
             st.session_state.htcc_bytes_m2 = None
+            st.session_state.kpi_total_proc_m2 = 0
+            st.session_state.kpi_validos_m2 = 0
+            st.session_state.kpi_revisar_m2 = 0
 
         if st.button("🚀 Procesar Información y Generar Análisis", type="primary"):
             with st.spinner("Procesando datos y estructurando archivos de Excel..."):
@@ -2068,6 +2069,33 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
                     ws_comp.freeze_panes, ws_comp.auto_filter.ref = f"A{FILA_ENCABEZADO + 1}", f"A{FILA_ENCABEZADO}:{get_column_letter(ws_comp.max_column)}{ws_comp.max_row}"
 
+                    # ── CÁLCULO DE KPIS BASADOS EN LA HOJA 'Comparaciones' DE HTCC ──
+                    total_proc_nomina = 0
+                    validos_count = 0
+                    revisar_count = 0
+
+                    col_nom_oper_idx = mapa_cols_ht_a_comp.get('NOM/Oper')
+                    col_dif_comp_idx = mapa_cols_ht_a_comp.get(COL_DIF_IDX)
+
+                    for r_comp in range(FILA_ENCABEZADO + 1, ws_comp.max_row + 1):
+                        val_nom_oper = str(ws_comp.cell(row=r_comp, column=col_nom_oper_idx).value or "").strip().lower()
+                        if val_nom_oper == "nomina":
+                            total_proc_nomina += 1
+                            val_dif = ws_comp.cell(row=r_comp, column=col_dif_comp_idx).value
+                            
+                            # Evaluar la celda Diferencia de Nomina
+                            es_cero = False
+                            if val_dif is not None:
+                                try:
+                                    es_cero = (abs(float(val_dif)) < 0.01)
+                                except (ValueError, TypeError):
+                                    es_cero = (str(val_dif).strip() in ("0", "0.00", "0,00"))
+
+                            if es_cero:
+                                validos_count += 1
+                            else:
+                                revisar_count += 1
+
                     htcc_buffer = io.BytesIO()
                     wb_htcc.save(htcc_buffer)
 
@@ -2213,12 +2241,15 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     
                     st.session_state.output_bytes_m2 = output_buffer.getvalue()
                     st.session_state.htcc_bytes_m2 = htcc_buffer.getvalue()
+                    st.session_state.kpi_total_proc_m2 = total_proc_nomina
+                    st.session_state.kpi_validos_m2 = validos_count
+                    st.session_state.kpi_revisar_m2 = revisar_count
                     st.session_state.procesado_m2 = True
 
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error inesperado al procesar: {e}")
 
-        # ── DESCARGA DE ARCHIVOS SIN MOSTRAR TABLAS VISUALES EN PANTALLA ──
+        # ── DESCARGA DE ARCHIVOS Y TARJETAS KPIS DEL MÓDULO 2 ──
         if st.session_state.get("procesado_m2", False):
             st.success("🎉 ¡Reporte y Consolidación Multi-Periodo procesados exitosamente!")
             
@@ -2239,3 +2270,31 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="d_btn_m2_2"
                 )
+
+            # ── DESPLIEGUE DE TARJETAS KPIS DEL MÓDULO 2 ──
+            st.markdown("<br><h3 style='color: #00529B; font-weight: 700;'>📊 Resumen Ejecutivo de Auditoría de Nómina</h3>", unsafe_allow_html=True)
+            kpi_m2_1, kpi_m2_2, kpi_m2_3 = st.columns(3)
+
+            with kpi_m2_1:
+                st.markdown(f"""
+                    <div class="kpi-card kpi-card-info">
+                        <div class="kpi-title kpi-title-info">📋 Total Registros Procesados</div>
+                        <div class="kpi-value kpi-value-info">{st.session_state.kpi_total_proc_m2:,}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_m2_2:
+                st.markdown(f"""
+                    <div class="kpi-card kpi-card-success">
+                        <div class="kpi-title kpi-title-success">✅ Registros Válidos</div>
+                        <div class="kpi-value kpi-value-success">{st.session_state.kpi_validos_m2:,}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            with kpi_m2_3:
+                st.markdown(f"""
+                    <div class="kpi-card kpi-card-warning">
+                        <div class="kpi-title kpi-title-warning">⚠️ Registros a Revisar</div>
+                        <div class="kpi-value kpi-value-warning">{st.session_state.kpi_revisar_m2:,}</div>
+                    </div>
+                """, unsafe_allow_html=True)
