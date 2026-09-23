@@ -1198,7 +1198,7 @@ if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
 
 elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
-    st.markdown("<h2 style='color: #00529B; font-weight: 700;'>📊 Módulo de Análisis Auditoría TS & Compensatorios</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #00529B; font-weight: 700;'>📊 Módulo Auditoría TS & Compensatorios</h2>", unsafe_allow_html=True)
 
     # ── Configuración Inicial Interna del Módulo 2 ──
     MAPA_ausencias = {
@@ -1380,11 +1380,11 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
     col_file1, col_file2, col_file3 = st.columns(3)
     with col_file1:
-        archivo_cargado = st.file_uploader("Subir plantilla de Asistencia (.xlsx)", type=["xlsx"], key="u_asistencia")
+        archivo_cargado = st.file_uploader("Planilla de Marcaciones (.xlsx)", type=["xlsx"], key="u_asistencia")
     with col_file2:
-        archivo_htcc = st.file_uploader("Subir plantilla de Consolidación HTCC (.xlsx)", type=["xlsx"], key="u_htcc")
+        archivo_htcc = st.file_uploader("Nómina (.xlsx)", type=["xlsx"], key="u_htcc")
     with col_file3:
-        archivo_operativo = st.file_uploader("Subir Reporte Operativo (.xlsx)", type=["xlsx"], key="u_operativo")
+        archivo_operativo = st.file_uploader("Nómina Compensación de Tiempos (.xlsx)", type=["xlsx"], key="u_operativo")
 
     if archivo_cargado is not None and archivo_htcc is not None and archivo_operativo is not None:
         xl = pd.ExcelFile(archivo_cargado)
