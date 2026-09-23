@@ -15,7 +15,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 import streamlit as st
 
-# Desactivar advertencias no críticas y de certificados SSL
+# Ocultar advertencias no críticas y de certificados SSL
 warnings.filterwarnings('ignore', category=UserWarning)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -1436,6 +1436,76 @@ def procesar_plantilla_geovictoria(
     return output, conteo_ausencias, conteo_p, total_filas, pd.DataFrame(registros_novedades), htcc_bytes, kpi_total_proc_m2, kpi_validos_m2, kpi_revisar_m2, excel_novasoft_api
 
 
+# ─── CARGA DE ARCHIVOS BBDD DE LA PLATAFORMA ─────────────────────────────
+
+with st.expander("📁 Bases de datos", expanded=True):
+    col1, col2 = st.columns(2, gap="large")
+
+    with col1:
+        file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"], help="Origen Geovictoria")
+        file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"], help="BD que el supervisor envía a nómina con los compensatorios")
+        file_sic = st.file_uploader("4. BBDD Gestión de personal SIC (.xlsx)", type=["xlsx"], help="Archivo descargado por el usuario del módulo SIC")
+        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"], help="Ubicaciones descargadas del módulo de supernumerarios")
+
+    with col2:
+        file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"], help="BD maestro del personal de la compañía")
+        file_historial = st.file_uploader("6. BBDD Historia laboral de empleados (.xlsx)", type=["xlsx"], help="BD descargada del SIC")
+        file_nomina = st.file_uploader("8. Nómina (.xlsx)", type=["xlsx"], help="Plantilla de Nómina para consolidación HTCC")
+
+lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]
+
+if file_historial:
+    try:
+        excel_hist_temp = pd.ExcelFile(file_historial)
+        target_data_sheet = None
+        for sheet_name in excel_hist_temp.sheet_names:
+            if sheet_name.strip().lower() == "data":
+                target_data_sheet = sheet_name
+                break
+        
+        if target_data_sheet:
+            df_cc_data = pd.read_excel(file_historial, sheet_name=target_data_sheet)
+            if not df_cc_data.empty:
+                centros_extraidos = df_cc_data.iloc[:, 0].dropna().astype(str).str.strip().unique().tolist()
+                centros_extraidos = [c for c in centros_extraidos if c.lower() != "centro de costos"]
+                if centros_extraidos:
+                    lista_cc = sorted(list(set(centros_extraidos)))
+    except Exception as e:
+        st.warning(f"⚠️ No se pudo leer la hoja 'data' del Historial Laboral: {e}")
+
+st.sidebar.markdown("## ⚙️ Parámetros de Configuración")
+contrato_principal = st.sidebar.selectbox("Contrato / CC Principal", options=lista_cc, index=0)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📅 Filtro Rango de Fechas")
+fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 2, 1))
+fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 2, 28))
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+<div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
+    <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
+    <small style="color: #475569;">1. Carga los archivos requeridos.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+</div>
+""", unsafe_allow_html=True)
+
+with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
+    st.caption("Solo modifica estos campos si los libros de Excel tienen nombres de hoja diferentes a los estándar.")
+    c_a, c_b = st.columns(2)
+    with c_a:
+        hoja_entrada = st.text_input("1. Hoja Marcaciones", value="Marcaciones")
+        hoja_festivos = st.text_input("Hoja Festivos", value="Festivos")
+        hoja_operativa = st.text_input("2. Hoja Operativa", value="CONSOLIDADO")
+        hoja_novasoft = st.text_input("3. Hoja Novasoft", value="BBDD_Novasof")
+    with c_b:
+        hoja_sic = st.text_input("4. Hoja SIC", value="Datos")
+        hoja_maestro = st.text_input("5. Hoja Maestro", value="NOM1911")
+        hoja_historial = st.text_input("6. Hoja Historial", value="Hoja 1")
+        hoja_supernumerario = st.text_input("7. Hoja Supernumerario", value="Base")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+
 # ─── EJECUCIÓN DEL BOTÓN UNIFICADO ────────────────────────────────────────
 
 if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"):
@@ -1445,11 +1515,11 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
         st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando información y unificando módulos..."):
+            with st.spinner("Procesando información y conectando con API Novasoft..."):
                 excel_salida, kpi_ausencias, kpi_p, total_filas, df_novedades_res, htcc_bytes, kpi_total_m2, kpi_validos_m2, kpi_revisar_m2, novasoft_api_file = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
-                    file_novasoft=file_novasoft if file_novasoft else novasoft_api_file, sheet_novasoft=hoja_novasoft,
+                    file_novasoft=novasoft_api_file, sheet_novasoft=hoja_novasoft,
                     file_sic=file_sic, sheet_sic=hoja_sic,
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
                     file_historial=file_historial, sheet_historial=hoja_historial,
