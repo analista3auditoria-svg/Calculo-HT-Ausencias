@@ -369,7 +369,6 @@ COLORES_LETRAS = {
 # ─── FUNCIONES DE CONSULTA SQL SERVER ────────────────────────────────────
 
 def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, fecha_fin_str):
-    """Consulta la BBDD Ubicaciones (#7) directamente vía SQL Server"""
     query_sql = f"""
     SELECT 
         super.c_coordinador AS [Coord.],
@@ -432,7 +431,6 @@ def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, f
 
 
 def consultar_sql_sic(server, database, user, password, fecha_ini_str, fecha_fin_str):
-    """Consulta la BBDD Gestión de personal SIC (#4) directamente vía SQL Server"""
     query_sql = f"""
     SELECT
         CE.PK_CEO_ControlEmpleado AS Codigo_Novedad,
@@ -473,8 +471,6 @@ def consultar_sql_sic(server, database, user, password, fecha_ini_str, fecha_fin
     df_sql = pd.read_sql(query_sql, conn)
     conn.close()
 
-    # Mapeo y ajuste estructural de columnas para que coincida exactamente con los índices del DataFrame procesado
-    # Índice 1: Proceso, Índice 4: Fecha_Inicio, Índice 5: Fecha_Fin, Índice 9: Cédula, Índice 32: Estado
     cols_totales = [f"Col_{idx}" for idx in range(35)]
     df_formateado = pd.DataFrame(columns=cols_totales)
 
@@ -806,7 +802,8 @@ def procesar_plantilla_geovictoria(
     file_supernumerario, sheet_supernumerario,
     contrato_principal,
     fecha_ini_sup, fecha_fin_sup,
-    file_nomina
+    file_nomina,
+    fecha_ini_nova_param, fecha_fin_nova_param
 ):
     df_marc_raw = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
@@ -1452,11 +1449,11 @@ def procesar_plantilla_geovictoria(
     wb.save(output)
     output.seek(0)
     
-    # ── SEGUNDA FASE: SI NO SE CARGÓ NOVASOFT MANUALMENTE, CONSUMIR API ──
+    # ── SEGUNDA FASE: SI NO SE CARGÓ NOVASOFT MANUALMENTE, CONSUMIR API CON RANGO PROPIO ──
     excel_novasoft_api = None
     if not file_novasoft:
-        f_ini_str = fecha_ini_sup.strftime("%Y-%m-%d")
-        f_fin_str = fecha_fin_sup.strftime("%Y-%m-%d")
+        f_ini_str = fecha_ini_nova_param.strftime("%Y-%m-%d")
+        f_fin_str = fecha_fin_nova_param.strftime("%Y-%m-%d")
         excel_novasoft_api = consumir_y_generar_excel_novasoft(f_ini_str, f_fin_str)
 
     # ── TERCERA FASE: SI SE DISPONE DE PLANILLA DE NÓMINA (BBDD 8) PROCESAR HTCC ──
@@ -1610,15 +1607,21 @@ st.sidebar.markdown("---")
 contrato_principal = st.sidebar.selectbox("Contrato / CC Principal", options=lista_cc, index=0)
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📅 Filtro Rango de Fechas")
-fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 9, 1))
-fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 9, 10))
+st.sidebar.markdown("### 📅 Filtro Rango de Fechas Auditoría General")
+fecha_ini_sup = st.sidebar.date_input("Fecha Inicial Auditoría", value=datetime.date(2026, 9, 1))
+fecha_fin_sup = st.sidebar.date_input("Fecha Final Auditoría", value=datetime.date(2026, 9, 10))
+
+# ── NUEVA SECCIÓN EN EL SIDEBAR: FILTRO RANGO DE FECHAS INDEPENDIENTE PARA API NOVASOFT ──
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ☁️ Filtro Rango de Fechas API Novasoft")
+fecha_ini_nova = st.sidebar.date_input("Fecha Inicial Novasoft API", value=datetime.date(2026, 9, 1))
+fecha_fin_nova = st.sidebar.date_input("Fecha Final Novasoft API", value=datetime.date(2026, 9, 10))
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Carga las bases de datos requeridas.<br>3. Ejecuta la auditoría unificada.</small>
+    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Ajusta el rango de fechas para la API Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1639,7 +1642,7 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
 st.markdown("<br>", unsafe_allow_html=True)
 
 
-# ─── EJECUCIÓN DEL BOTÓN UNIFICADO CON CONEXIÓN SQL ────────────────────────
+# ─── EJECUCIÓN DEL BOTÓN UNIFICADO CON CONEXIÓN SQL Y API NOVASOFT ────────
 
 if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"):
     if not file_entrada:
@@ -1669,14 +1672,16 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                 excel_salida, kpi_ausencias, kpi_p, total_filas, df_novedades_res, htcc_bytes, kpi_total_m2, kpi_validos_m2, kpi_revisar_m2, novasoft_api_file = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
-                    file_novasoft=novasoft_api_file, sheet_novasoft=hoja_novasoft,
+                    file_novasoft=None, sheet_novasoft=hoja_novasoft,
                     file_sic=file_sql_sic, sheet_sic="Datos",
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
                     file_historial=file_historial, sheet_historial=hoja_historial,
                     file_supernumerario=file_sql_supernumerario, sheet_supernumerario="Base",
                     contrato_principal=contrato_principal,
                     fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup,
-                    file_nomina=file_nomina
+                    file_nomina=file_nomina,
+                    fecha_ini_nova_param=fecha_ini_nova,
+                    fecha_fin_nova_param=fecha_fin_nova
                 )
 
             st.session_state["procesado_exitoso"] = True
