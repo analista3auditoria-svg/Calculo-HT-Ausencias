@@ -1513,12 +1513,14 @@ if file_historial:
 st.sidebar.markdown("## ⚙️ Parámetros de Configuración")
 
 # ── CAMPOS DE AUTENTICACIÓN SQL SERVER EN SIDEBAR ──
-st.sidebar.markdown("### 🗄️ Conexión SQL Server (Ubicaciones y SIC)")
+st.sidebar.markdown("### 🗄️ Conexión SQL Server")
 sql_server = st.sidebar.text_input("Servidor SQL", value="192.168.1.3")
-sql_database_ubicaciones = st.sidebar.text_input("Base de Datos SQL Ubicaciones", value="BD_SUPERNUMERARIOS")
-sql_database_sic = st.sidebar.text_input("Base de Datos SQL SIC", value="BD_SIC")
 sql_user = st.sidebar.text_input("Usuario SQL", value="USR_AUDITORIA")
 sql_password = st.sidebar.text_input("Contraseña SQL", type="password")
+
+# Nombres de bases de datos predefinidos
+sql_database_ubicaciones = "BD_SUPERNUMERARIOS"
+sql_database_sic = "BD_SIC"
 
 st.sidebar.markdown("---")
 contrato_principal = st.sidebar.selectbox("Contrato / CC Principal", options=lista_cc, index=0)
@@ -1608,8 +1610,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal,
                     fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup,
                     file_nomina=file_nomina,
-                    fecha_ini_nova_param=rango_fechas_nova_slider[0],
-                    fecha_fin_nova_param=rango_fechas_nova_slider[1]
+                    rango_fechas_nova_slider=rango_fechas_nova_slider
                 )
 
             st.session_state["procesado_exitoso"] = True
