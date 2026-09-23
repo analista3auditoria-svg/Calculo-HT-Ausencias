@@ -6,6 +6,7 @@ import datetime
 import warnings
 import urllib3
 import requests
+import pymssql
 import pandas as pd
 import numpy as np
 import openpyxl
@@ -144,7 +145,6 @@ st.markdown("""
         .kpi-value-info { color: #00529B; }
         .kpi-value-success { color: #16a34a; }
 
-        /* Estilizado avanzado para Sliders corporativos */
         div[data-baseweb="slider"] {
             margin-top: 10px;
             margin-bottom: 10px;
@@ -160,7 +160,6 @@ st.markdown("""
             height: 20px !important;
         }
 
-        /* Botones y Uploader */
         div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -283,7 +282,7 @@ COLORES_LETRAS = {
 }
 
 
-# ─── FUNCIONES DE CONSULTA SQL SERVER ────────────────────────────────────
+# ─── FUNCIONES DE CONSULTA SQL SERVER (USANDO PYMSSQL) ───────────────────
 
 def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, fecha_fin_str):
     query_sql = f"""
@@ -329,14 +328,7 @@ def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, f
     ORDER BY [Fecha];
     """
     
-    try:
-        import pymssql
-        conn = pymssql.connect(server=server, user=user, password=password, database=database)
-    except ImportError:
-        import pyodbc
-        conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={user};PWD={password};"
-        conn = pyodbc.connect(conn_str)
-
+    conn = pymssql.connect(server=server, user=user, password=password, database=database)
     df_sql = pd.read_sql(query_sql, conn)
     conn.close()
 
@@ -377,14 +369,7 @@ def consultar_sql_sic(server, database, user, password, fecha_ini_str, fecha_fin
     ORDER BY CE.PK_CEO_ControlEmpleado;
     """
 
-    try:
-        import pymssql
-        conn = pymssql.connect(server=server, user=user, password=password, database=database)
-    except ImportError:
-        import pyodbc
-        conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={user};PWD={password};"
-        conn = pyodbc.connect(conn_str)
-
+    conn = pymssql.connect(server=server, user=user, password=password, database=database)
     df_sql = pd.read_sql(query_sql, conn)
     conn.close()
 
@@ -580,7 +565,6 @@ def consumir_y_generar_excel_novasoft(fec_ini_str, fec_fin_str):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def consumir_y_generar_excel_historia_laboral():
-    """Consulta la API HistoriaLaboralEmpleados de Novasoft y genera el Excel en memoria"""
     token = obtener_token_novasoft()
     
     fec_ini = "2020-01-01"
@@ -615,7 +599,6 @@ def consumir_y_generar_excel_historia_laboral():
     with pd.ExcelWriter(output_hl, engine='openpyxl') as writer:
         df_hl.to_excel(writer, index=False, sheet_name="Hoja 1")
         
-        # Pestaña "data" con centros de costo únicos para el selectbox
         if not df_hl.empty and "Centro de costos" in df_hl.columns:
             cc_unicos = df_hl["Centro de costos"].dropna().astype(str).str.strip().unique()
             df_cc = pd.DataFrame({"Centro de costos": sorted(list(cc_unicos))})
@@ -664,6 +647,13 @@ def estilo_etiqueta_ausentismo(val):
         return 'background-color: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
     else:
         return 'background-color: #E0F2FE; color: #0369A1; border: 1.5px solid #7DD3FC; border-radius: 12px; font-weight: bold; text-align: center; padding: 4px 8px;'
+
+def df_a_excel_bytes(df, sheet_name="Detalle_Novedades"):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+    output.seek(0)
+    return output.getvalue()
 
 def hhmm_a_decimal(texto):
     if pd.isna(texto): return None
@@ -1479,7 +1469,7 @@ def procesar_plantilla_geovictoria(
                 if col_nombre_libro3 and cell.column == col_nombre_libro3: nom_val = str(cell.value).strip() if cell.value else None
                 if cell.column == col_concepto_libro3: conc_val = str(cell.value).strip().lower() if cell.value else None
             if periodo_val and id_val and conc_val and id_val not in ("None", "nan", ""):
-                indice_filas[(periodo_val, id_str, conc_val)] = fila_num
+                indice_filas[(periodo_val, id_val, conc_val)] = fila_num
                 if id_val and nom_val:
                     mapa_nombres_ht[id_val] = nom_val
 
@@ -1578,7 +1568,7 @@ st.sidebar.markdown("### 📅 Filtro Rango de Fechas Auditoría General")
 fecha_ini_sup = st.sidebar.date_input("Fecha Inicial Auditoría", value=datetime.date(2026, 9, 1))
 fecha_fin_sup = st.sidebar.date_input("Fecha Final Auditoría", value=datetime.date(2026, 9, 10))
 
-# ── SLICER PROFESIONAL TIPO BARRA DESLIZANTE PARA API NOVASOFT ──
+# ── SLICER PROFESIONAL TIPO BARRA DESLIZANTE CON RANGO DE FECHAS ──
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ☁️ Filtro Rango de Fechas API Novasoft")
 
