@@ -1449,7 +1449,7 @@ def procesar_plantilla_geovictoria(
     wb.save(output)
     output.seek(0)
     
-    # ── SEGUNDA FASE: SI NO SE CARGÓ NOVASOFT MANUALMENTE, CONSUMIR API CON RANGO PROPIO APLICANDO SUMA Y RESTA DE DÍAS ──
+    # ── SEGUNDA FASE: CONSUMIR API NOVASOFT APLICANDO LA SUMA Y RESTA DE DÍAS ──
     excel_novasoft_api = None
     if not file_novasoft:
         f_ini_nova_calc = fecha_ini_nova_param - datetime.timedelta(days=dias_restar_nova)
@@ -1597,7 +1597,7 @@ if file_historial:
 
 st.sidebar.markdown("## ⚙️ Parámetros de Configuración")
 
-# ── CAMPOS DE AUTENTICACIÓN SQL SERVER (BBDD UBICACIONES Y BBDD SIC) EN SIDEBAR ──
+# ── CAMPOS DE AUTENTICACIÓN SQL SERVER EN SIDEBAR ──
 st.sidebar.markdown("### 🗄️ Conexión SQL Server (Ubicaciones y SIC)")
 sql_server = st.sidebar.text_input("Servidor SQL", value="192.168.1.3")
 sql_database_ubicaciones = st.sidebar.text_input("Base de Datos SQL Ubicaciones", value="BD_SUPERNUMERARIOS")
@@ -1613,14 +1613,14 @@ st.sidebar.markdown("### 📅 Filtro Rango de Fechas Auditoría General")
 fecha_ini_sup = st.sidebar.date_input("Fecha Inicial Auditoría", value=datetime.date(2026, 9, 1))
 fecha_fin_sup = st.sidebar.date_input("Fecha Final Auditoría", value=datetime.date(2026, 9, 10))
 
-# ── FILTRO Y SUMA/RESTA DE DÍAS PARA API NOVASOFT EN EL SIDEBAR ──
+# ── BARRAS DESLIZANTES (SLIDERS) PARA SUMAR/RESTAR DÍAS EN API NOVASOFT ──
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ☁️ Filtro Rango de Fechas API Novasoft")
 fecha_ini_nova = st.sidebar.date_input("Fecha Inicial Novasoft API", value=datetime.date(2026, 9, 1))
-dias_restar_nova = st.sidebar.number_input("Días a restar a la Fecha Inicial", min_value=0, max_value=365, value=0, step=1)
+dias_restar_nova = st.sidebar.slider("Días a restar a la Fecha Inicial", min_value=0, max_value=60, value=0, step=1)
 
 fecha_fin_nova = st.sidebar.date_input("Fecha Final Novasoft API", value=datetime.date(2026, 9, 10))
-dias_sumar_nova = st.sidebar.number_input("Días a sumar a la Fecha Final", min_value=0, max_value=365, value=0, step=1)
+dias_sumar_nova = st.sidebar.slider("Días a sumar a la Fecha Final", min_value=0, max_value=60, value=0, step=1)
 
 # Cálculo dinámico visible de rango aplicado
 f_ini_nova_vista = fecha_ini_nova - datetime.timedelta(days=dias_restar_nova)
@@ -1631,7 +1631,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Ajusta el rango y margen de días para la API Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
+    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Desliza las barras para ajustar la tolerancia de días en Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
 </div>
 """, unsafe_allow_html=True)
 
