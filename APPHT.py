@@ -6,7 +6,6 @@ import datetime
 import warnings
 import urllib3
 import requests
-import pyodbc
 import pandas as pd
 import numpy as np
 import openpyxl
@@ -367,12 +366,10 @@ COLORES_LETRAS = {
 }
 
 
-# ─── FUNCION DE CONSULTA SQL SERVER (BBDD UBICACIONES) ───────────────────
+# ─── FUNCIONES DE CONSULTA SQL SERVER ────────────────────────────────────
 
 def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, fecha_fin_str):
-    """Consulta la BBDD Ubicaciones directamente vía pyodbc con SQL Server"""
-    conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={user};PWD={password};"
-    
+    """Consulta la BBDD Ubicaciones (#7) directamente vía SQL Server"""
     query_sql = f"""
     SELECT 
         super.c_coordinador AS [Coord.],
@@ -415,14 +412,81 @@ def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, f
       AND req.id_tipo_novedad != '50'
     ORDER BY [Fecha];
     """
+    
+    try:
+        import pymssql
+        conn = pymssql.connect(server=server, user=user, password=password, database=database)
+    except ImportError:
+        import pyodbc
+        conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={user};PWD={password};"
+        conn = pyodbc.connect(conn_str)
 
-    conn = pyodbc.connect(conn_str)
     df_sql = pd.read_sql(query_sql, conn)
     conn.close()
 
     output_sql = io.BytesIO()
     with pd.ExcelWriter(output_sql, engine='openpyxl') as writer:
         df_sql.to_excel(writer, index=False, sheet_name="Base")
+    output_sql.seek(0)
+    return output_sql
+
+
+def consultar_sql_sic(server, database, user, password, fecha_ini_str, fecha_fin_str):
+    """Consulta la BBDD Gestión de personal SIC (#4) directamente vía SQL Server"""
+    query_sql = f"""
+    SELECT
+        CE.PK_CEO_ControlEmpleado AS Codigo_Novedad,
+        CE.CEO_Estado AS Proceso,
+        CE.CEO_FechaInicio AS Fecha_Inicio,
+        CE.CEO_FechaFinal AS Fecha_Fin,
+        PP.PPL_Cedula AS Cedula,
+        CONCAT(PP.PPL_PrimerNombre, ' ', PP.PPL_SegundoNombre, ' ', PP.PPL_PrimerApellido, ' ', PP.PPL_SegundoApellido) AS Nombre,
+        (CASE 
+            WHEN CE.CEO_EstadoAut = 2 THEN 'Autorizado' 
+            WHEN CE.CEO_EstadoAut = 12 THEN 'Nomina' 
+            WHEN CE.CEO_EstadoAut = 8 THEN 'Falta Adjunto' 
+            WHEN CE.CEO_EstadoAut = 9 THEN 'Archivo Adjuntado' 
+            WHEN CE.CEO_EstadoAut = 20 THEN 'Terminado' 
+            WHEN CE.CEO_EstadoAut = 15 THEN 'OtroSi' 
+            WHEN CE.CEO_EstadoAut = 4 THEN 'Anulado' 
+            WHEN CE.CEO_EstadoAut = 21 THEN 'En Proceso' 
+            ELSE 'Nuevo' 
+        END) AS Estado
+    FROM tecno.tbl_controlempleado AS CE
+    LEFT JOIN tecno.tbl_plantapersonal AS PP
+        ON CE.FK_TBL_PlantaPersonal = PP.PK_PPL_PlantaPersonal
+    WHERE PP.PPL_Cedula IS NOT NULL
+        AND CE.CEO_EstadoAut = 12
+        AND CE.CEO_Estado NOT IN ('Compensacion', 'VacunasTitulacion', 'Otrosi y/o Traslado Ceco', 'Contratacion', 'Supernumerario')
+        AND CE.CEO_FechaInicio >= '{fecha_ini_str}' AND CE.CEO_FechaInicio <= '{fecha_fin_str}'
+    ORDER BY CE.PK_CEO_ControlEmpleado;
+    """
+
+    try:
+        import pymssql
+        conn = pymssql.connect(server=server, user=user, password=password, database=database)
+    except ImportError:
+        import pyodbc
+        conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={user};PWD={password};"
+        conn = pyodbc.connect(conn_str)
+
+    df_sql = pd.read_sql(query_sql, conn)
+    conn.close()
+
+    # Mapeo y ajuste estructural de columnas para que coincida exactamente con los índices del DataFrame procesado
+    # Índice 1: Proceso, Índice 4: Fecha_Inicio, Índice 5: Fecha_Fin, Índice 9: Cédula, Índice 32: Estado
+    cols_totales = [f"Col_{idx}" for idx in range(35)]
+    df_formateado = pd.DataFrame(columns=cols_totales)
+
+    df_formateado["Col_1"] = df_sql["Proceso"]
+    df_formateado["Col_4"] = df_sql["Fecha_Inicio"]
+    df_formateado["Col_5"] = df_sql["Fecha_Fin"]
+    df_formateado["Col_9"] = df_sql["Cedula"]
+    df_formateado["Col_32"] = df_sql["Estado"]
+
+    output_sql = io.BytesIO()
+    with pd.ExcelWriter(output_sql, engine='openpyxl') as writer:
+        df_formateado.to_excel(writer, index=False, sheet_name="Datos")
     output_sql.seek(0)
     return output_sql
 
@@ -1505,7 +1569,6 @@ with st.expander("📁 Bases de datos", expanded=True):
     with col1:
         file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"], help="Origen Geovictoria")
         file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"], help="BD que el supervisor envía a nómina con los compensatorios")
-        file_sic = st.file_uploader("4. BBDD Gestión de personal SIC (.xlsx)", type=["xlsx"], help="Archivo descargado por el usuario del módulo SIC")
 
     with col2:
         file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"], help="BD maestro del personal de la compañía")
@@ -1535,10 +1598,11 @@ if file_historial:
 
 st.sidebar.markdown("## ⚙️ Parámetros de Configuración")
 
-# ── CAMPOS DE AUTENTICACIÓN SQL SERVER (BBDD UBICACIONES) EN SIDEBAR ──
-st.sidebar.markdown("### 🗄️ Conexión SQL (Ubicaciones)")
+# ── CAMPOS DE AUTENTICACIÓN SQL SERVER (BBDD UBICACIONES Y BBDD SIC) EN SIDEBAR ──
+st.sidebar.markdown("### 🗄️ Conexión SQL Server (Ubicaciones y SIC)")
 sql_server = st.sidebar.text_input("Servidor SQL", value="192.168.1.3")
-sql_database = st.sidebar.text_input("Base de Datos SQL", value="BD_SUPERNUMERARIOS")
+sql_database_ubicaciones = st.sidebar.text_input("Base de Datos SQL Ubicaciones", value="BD_SUPERNUMERARIOS")
+sql_database_sic = st.sidebar.text_input("Base de Datos SQL SIC", value="BD_SIC")
 sql_user = st.sidebar.text_input("Usuario SQL", value="USR_AUDITORIA")
 sql_password = st.sidebar.text_input("Contraseña SQL", type="password")
 
@@ -1583,16 +1647,22 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
     elif not contrato_principal:
         st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
     elif not sql_password:
-        st.error("⚠️ Por favor, ingresa la contraseña para conectarse al servidor SQL de Ubicaciones en el panel izquierdo.")
+        st.error("⚠️ Por favor, ingresa la contraseña para conectarse al servidor SQL en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Conectando a SQL Server y procesando auditoría unificada..."):
+            with st.spinner("Conectando a SQL Server, API Novasoft y procesando auditoría unificada..."):
                 f_ini_sql = fecha_ini_sup.strftime("%Y-%m-%d")
                 f_fin_sql = fecha_fin_sup.strftime("%Y-%m-%d")
                 
-                # Consulta dinámica a SQL Server para obtener la BBDD Ubicaciones (#7)
+                # 1. Consulta dinámica a SQL Server para obtener BBDD Ubicaciones (#7)
                 file_sql_supernumerario = consultar_sql_ubicaciones(
-                    sql_server, sql_database, sql_user, sql_password,
+                    sql_server, sql_database_ubicaciones, sql_user, sql_password,
+                    f_ini_sql, f_fin_sql
+                )
+
+                # 2. Consulta dinámica a SQL Server para obtener BBDD Gestión de personal SIC (#4)
+                file_sql_sic = consultar_sql_sic(
+                    sql_server, sql_database_sic, sql_user, sql_password,
                     f_ini_sql, f_fin_sql
                 )
 
@@ -1600,7 +1670,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
                     file_novasoft=novasoft_api_file, sheet_novasoft=hoja_novasoft,
-                    file_sic=file_sic, sheet_sic=hoja_sic,
+                    file_sic=file_sql_sic, sheet_sic="Datos",
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
                     file_historial=file_historial, sheet_historial=hoja_historial,
                     file_supernumerario=file_sql_supernumerario, sheet_supernumerario="Base",
