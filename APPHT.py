@@ -2071,28 +2071,21 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
 
                     ws_comp.freeze_panes, ws_comp.auto_filter.ref = f"A{FILA_ENCABEZADO + 1}", f"A{FILA_ENCABEZADO}:{get_column_letter(ws_comp.max_column)}{ws_comp.max_row}"
 
-                    # ── CÁLCULO SEGURO DE KPIS REFRESCANDO COLUMNAS ──
+                    # ── CÁLCULO DE KPIS EVALUANDO LA OBSERVACIÓN "Sin diferencias" ──
                     total_proc_nomina = 0
                     validos_count = 0
                     revisar_count = 0
 
                     col_nom_oper_idx = mapa_cols_ht_a_comp.get('NOM/Oper')
-                    col_dif_comp_idx = mapa_cols_ht_a_comp.get(COL_DIF_IDX)
 
                     for r_comp in range(FILA_ENCABEZADO + 1, ws_comp.max_row + 1):
                         cell_tipo = ws_comp.cell(row=r_comp, column=col_nom_oper_idx).value
                         if cell_tipo and str(cell_tipo).strip().lower() == "nomina":
                             total_proc_nomina += 1
-                            val_dif = ws_comp.cell(row=r_comp, column=col_dif_comp_idx).value
+                            txt_obs = str(ws_comp.cell(row=r_comp, column=col_obs_idx).value or "").strip()
                             
-                            es_cero = False
-                            if val_dif is not None:
-                                try:
-                                    es_cero = (abs(float(val_dif)) < 0.01)
-                                except (ValueError, TypeError):
-                                    es_cero = (str(val_dif).strip() in ("0", "0.00", "0,00"))
-
-                            if es_cero:
+                            # Si dice "Sin diferencias", la celda Diferencia es 0.00
+                            if txt_obs == "Sin diferencias":
                                 validos_count += 1
                             else:
                                 revisar_count += 1
@@ -2272,7 +2265,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     key="d_btn_m2_2"
                 )
 
-            # Extraer variables con respaldo seguro
             val_total_proc = st.session_state.get("kpi_total_proc_m2", 0)
             val_validos = st.session_state.get("kpi_validos_m2", 0)
             val_revisar = st.session_state.get("kpi_revisar_m2", 0)
