@@ -4,4 +4,4 @@ numpy
 openpyxl
 requests
 urllib3
-pyodbc
+pymssql
