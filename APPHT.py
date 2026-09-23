@@ -1802,6 +1802,11 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     ws_htcc.cell(row=FILA_ENCABEZADO, column=COL_DIF_IDX).fill = PatternFill(fill_type="solid", fgColor="000000")
                     ws_htcc.cell(row=FILA_ENCABEZADO, column=COL_DIF_IDX).alignment = Alignment(horizontal="center", vertical="center")
 
+                    # ── CÁLCULO DIRECTO Y EXACTO DE KPIS DESDE HOJA HT EN MEMORIA ──
+                    total_proc_nomina = 0
+                    validos_count = 0
+                    revisar_count = 0
+
                     for (periodo, id_str, conc_libro3), fila_excel in indice_filas.items():
                         cols_periodo = cols_por_periodo.get(periodo, [])
                         if not cols_periodo: continue
@@ -1820,6 +1825,31 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                         formula_dif = f"=ROUND({col_cantidad_letra}{fila_excel}-{get_column_letter(COL_TOTAL_IDX)}{fila_excel},0)"
                         c_dif = ws_htcc.cell(row=fila_excel, column=COL_DIF_IDX, value=formula_dif)
                         c_dif.number_format, c_dif.font, c_dif.alignment, c_dif.fill = '#,##0.00', Font(name="Arial", size=9, bold=True), Alignment(horizontal="center", vertical="center"), PatternFill(fill_type="solid", fgColor="FFFFFF")
+
+                        # EVALUACIÓN DIRECTA DE LA HOJA HT EN MEMORIA
+                        total_proc_nomina += 1
+                        val_cant_nom = ws_htcc.cell(row=fila_excel, column=col_cantidad_libro3).value if col_cantidad_libro3 else 0
+                        
+                        suma_fechas_nom = 0.0
+                        for c_f_idx in cols_periodo:
+                            v_f = ws_htcc.cell(row=fila_excel, column=c_f_idx).value
+                            try:
+                                if v_f is not None:
+                                    suma_fechas_nom += float(v_f)
+                            except (ValueError, TypeError):
+                                pass
+
+                        try:
+                            val_cant_num = float(val_cant_nom) if val_cant_nom is not None else 0.0
+                        except (ValueError, TypeError):
+                            val_cant_num = 0.0
+
+                        dif_calculada = round(val_cant_num - suma_fechas_nom, 2)
+
+                        if abs(dif_calculada) < 0.01:
+                            validos_count += 1
+                        else:
+                            revisar_count += 1
 
                     ws_comp = wb_htcc.create_sheet('Comparaciones')
 
@@ -1925,11 +1955,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                     font_rojo_alerta = Font(name="Arial", size=9, color="FFFFFF", bold=True)
 
                     fila_comp = FILA_ENCABEZADO + 1
-
-                    # Mapeo y variables para conteo preciso de KPIs de la columna Diferencia
-                    total_proc_nomina = 0
-                    validos_count = 0
-                    revisar_count = 0
 
                     for (periodo, id_str, conc_libro3), fila_excel in indice_filas.items():
                         nombre_emp = ws_htcc.cell(row=fila_excel, column=col_nombre_libro3).value if col_nombre_libro3 else mapa_nombres_ht.get(id_str, "")
@@ -2071,32 +2096,6 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
                             c_obs_nom.alignment = Alignment(horizontal="center", vertical="center")
 
                         ws_comp.column_dimensions[get_column_letter(col_obs_idx)].width = 35
-
-                        # ── RECALCULAR Y EVALUAR LA DIFERENCIA (CANTIDAD - TOTAL) EN MEMORIA PARA CADA FILA NOMINA ──
-                        total_proc_nomina += 1
-                        val_cant_nom = ws_htcc.cell(row=fila_excel, column=col_cantidad_libro3).value if col_cantidad_libro3 else 0
-                        cols_per_act = cols_por_periodo.get(periodo.upper(), [])
-                        
-                        suma_fechas_nom = 0.0
-                        for c_f_idx in cols_per_act:
-                            v_f = ws_htcc.cell(row=fila_excel, column=c_f_idx).value
-                            try:
-                                if v_f is not None:
-                                    suma_fechas_nom += float(v_f)
-                            except (ValueError, TypeError):
-                                pass
-
-                        try:
-                            val_cant_num = float(val_cant_nom) if val_cant_nom is not None else 0.0
-                        except (ValueError, TypeError):
-                            val_cant_num = 0.0
-
-                        dif_calculada = round(val_cant_num - suma_fechas_nom, 2)
-
-                        if abs(dif_calculada) < 0.01:
-                            validos_count += 1
-                        else:
-                            revisar_count += 1
 
                         fila_comp += 2
 
