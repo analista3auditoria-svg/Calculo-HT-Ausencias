@@ -6,6 +6,7 @@ import datetime
 import warnings
 import urllib3
 import requests
+import pyodbc
 import pandas as pd
 import numpy as np
 import openpyxl
@@ -15,7 +16,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 import streamlit as st
 
-# Ocultar advertencias no críticas y de certificados SSL
+# Ocultar advertencias no críticas
 warnings.filterwarnings('ignore', category=UserWarning)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -364,6 +365,66 @@ COLORES_LETRAS = {
     "LIC": {"bg": "FFC000", "fg": "000000"},
     "DIA": {"bg": "92D050", "fg": "000000"},
 }
+
+
+# ─── FUNCION DE CONSULTA SQL SERVER (BBDD UBICACIONES) ───────────────────
+
+def consultar_sql_ubicaciones(server, database, user, password, fecha_ini_str, fecha_fin_str):
+    """Consulta la BBDD Ubicaciones directamente vía pyodbc con SQL Server"""
+    conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};UID={user};PWD={password};"
+    
+    query_sql = f"""
+    SELECT 
+        super.c_coordinador AS [Coord.],
+        asig.d_ultima_asignacion AS [Fecha],
+        super.c_cedula AS [Cédula],
+        super.c_apellido AS [Apellido],
+        super.c_nombre AS [Nombre],
+        super.d_fecha_ingreso AS [Ingreso],
+        super.d_fecha_retiro AS [Retiro],
+        super.i_estado AS [Estado],
+        (SELECT COUNT(d_ultima_asignacion) 
+         FROM t_asignacion_supern 
+         WHERE id_requerimiento = req.id_requerimiento 
+           AND d_ultima_asignacion >= '{fecha_ini_str}' 
+           AND d_ultima_asignacion <= '{fecha_fin_str}') AS [#días],
+        req.i_cant_horas AS [#horas],
+        req.id_requerimiento AS [#req.],
+        req.i_centro_costo AS [CC],
+        cli.c_razon_social AS [Cliente],
+        sucu.c_nombre AS [Sucursal],
+        nove.c_descripcion AS [Novedad],
+        em.c_cedula AS [Cédula_Emp],
+        em.c_nombres + ' ' + em.c_apellidos AS [Empleado],
+        req.c_ubicacion AS [Ubicación],
+        req.c_observacion AS [Observación],
+        req.c_hora_servicio_desde AS [Hora inicial],
+        req.c_hora_servicio_hasta AS [Hora final],
+        req.fecha_domingo_laborado AS [Dominical Laborado]
+    FROM t_asignacion_supern asig    
+    LEFT JOIN t_requerimiento_supern req ON asig.id_requerimiento = req.id_requerimiento    
+    LEFT JOIN t_supernumerario super ON super.id_supernumerario = asig.id_supernumerario    
+    LEFT JOIN t_sucursal sucu ON sucu.id_sucursal = req.id_sucursal    
+    LEFT JOIN t_cliente cli ON cli.id_cliente = sucu.id_cliente    
+    LEFT JOIN t_tipo_novedad nove ON nove.id_tipo_novedad = req.id_tipo_novedad    
+    LEFT JOIN t_empleado em ON em.c_cedula = req.id_empleado    
+    WHERE asig.d_ultima_asignacion >= '{fecha_ini_str}' 
+      AND asig.d_ultima_asignacion <= '{fecha_fin_str}' 
+      AND super.c_laboral LIKE 'ASEO Y CAFETERIA'      
+      AND req.c_estado NOT IN (6,5,1) 
+      AND req.id_tipo_novedad != '50'
+    ORDER BY [Fecha];
+    """
+
+    conn = pyodbc.connect(conn_str)
+    df_sql = pd.read_sql(query_sql, conn)
+    conn.close()
+
+    output_sql = io.BytesIO()
+    with pd.ExcelWriter(output_sql, engine='openpyxl') as writer:
+        df_sql.to_excel(writer, index=False, sheet_name="Base")
+    output_sql.seek(0)
+    return output_sql
 
 
 # ─── FUNCIONES DE INTEGRACIÓN DE API NOVASOFT ─────────────────────────────
@@ -1445,7 +1506,6 @@ with st.expander("📁 Bases de datos", expanded=True):
         file_entrada = st.file_uploader("1. BBDD Marcaciones Geovictoria (.xlsx)", type=["xlsx"], help="Origen Geovictoria")
         file_operativa = st.file_uploader("2. BBDD Nómina Compensación de tiempo (.xlsx)", type=["xlsx"], help="BD que el supervisor envía a nómina con los compensatorios")
         file_sic = st.file_uploader("4. BBDD Gestión de personal SIC (.xlsx)", type=["xlsx"], help="Archivo descargado por el usuario del módulo SIC")
-        file_supernumerario = st.file_uploader("7. BBDD Ubicaciones (.xlsx)", type=["xlsx"], help="Ubicaciones descargadas del módulo de supernumerarios")
 
     with col2:
         file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"], help="BD maestro del personal de la compañía")
@@ -1474,18 +1534,27 @@ if file_historial:
         st.warning(f"⚠️ No se pudo leer la hoja 'data' del Historial Laboral: {e}")
 
 st.sidebar.markdown("## ⚙️ Parámetros de Configuración")
+
+# ── CAMPOS DE AUTENTICACIÓN SQL SERVER (BBDD UBICACIONES) EN SIDEBAR ──
+st.sidebar.markdown("### 🗄️ Conexión SQL (Ubicaciones)")
+sql_server = st.sidebar.text_input("Servidor SQL", value="192.168.1.3")
+sql_database = st.sidebar.text_input("Base de Datos SQL", value="BD_SUPERNUMERARIOS")
+sql_user = st.sidebar.text_input("Usuario SQL", value="USR_AUDITORIA")
+sql_password = st.sidebar.text_input("Contraseña SQL", type="password")
+
+st.sidebar.markdown("---")
 contrato_principal = st.sidebar.selectbox("Contrato / CC Principal", options=lista_cc, index=0)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📅 Filtro Rango de Fechas")
-fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 2, 1))
-fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 2, 28))
+fecha_ini_sup = st.sidebar.date_input("Fecha Inicial", value=datetime.date(2026, 9, 1))
+fecha_fin_sup = st.sidebar.date_input("Fecha Final", value=datetime.date(2026, 9, 10))
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Carga los archivos requeridos.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Carga las bases de datos requeridas.<br>3. Ejecuta la auditoría unificada.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1506,16 +1575,27 @@ with st.expander("🛠️ Configuración Avanzada de Pestañas (Opcional)"):
 st.markdown("<br>", unsafe_allow_html=True)
 
 
-# ─── EJECUCIÓN DEL BOTÓN UNIFICADO ────────────────────────────────────────
+# ─── EJECUCIÓN DEL BOTÓN UNIFICADO CON CONEXIÓN SQL ────────────────────────
 
 if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"):
     if not file_entrada:
         st.error("⚠️ Es obligatorio cargar el archivo principal de Marcaciones (GeoVictoria).")
     elif not contrato_principal:
         st.error("⚠️ Por favor, selecciona el Contrato / Centro de Costo Principal en el panel izquierdo.")
+    elif not sql_password:
+        st.error("⚠️ Por favor, ingresa la contraseña para conectarse al servidor SQL de Ubicaciones en el panel izquierdo.")
     else:
         try:
-            with st.spinner("Procesando información y conectando con API Novasoft..."):
+            with st.spinner("Conectando a SQL Server y procesando auditoría unificada..."):
+                f_ini_sql = fecha_ini_sup.strftime("%Y-%m-%d")
+                f_fin_sql = fecha_fin_sup.strftime("%Y-%m-%d")
+                
+                # Consulta dinámica a SQL Server para obtener la BBDD Ubicaciones (#7)
+                file_sql_supernumerario = consultar_sql_ubicaciones(
+                    sql_server, sql_database, sql_user, sql_password,
+                    f_ini_sql, f_fin_sql
+                )
+
                 excel_salida, kpi_ausencias, kpi_p, total_filas, df_novedades_res, htcc_bytes, kpi_total_m2, kpi_validos_m2, kpi_revisar_m2, novasoft_api_file = procesar_plantilla_geovictoria(
                     file_entrada, hoja_entrada, sheet_festivos=hoja_festivos,
                     file_operativa=file_operativa, sheet_operativa=hoja_operativa,
@@ -1523,7 +1603,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     file_sic=file_sic, sheet_sic=hoja_sic,
                     file_maestro=file_maestro, sheet_maestro=hoja_maestro,
                     file_historial=file_historial, sheet_historial=hoja_historial,
-                    file_supernumerario=file_supernumerario, sheet_supernumerario=hoja_supernumerario,
+                    file_supernumerario=file_sql_supernumerario, sheet_supernumerario="Base",
                     contrato_principal=contrato_principal,
                     fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup,
                     file_nomina=file_nomina
@@ -1541,7 +1621,7 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
             st.session_state["kpi_revisar_m2"] = kpi_revisar_m2
 
         except Exception as e:
-            st.error(f"❌ Ocurrió un error durante el procesamiento: {str(e)}")
+            st.error(f"❌ Ocurrió un error durante la conexión o el procesamiento: {str(e)}")
 
 
 # ─── DESPLIEGUE PERSISTENTE DE RESULTADOS ─────────────────────────────────
