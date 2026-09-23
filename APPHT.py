@@ -1050,7 +1050,7 @@ if modulo_seleccionado == "1. Auditor TS & GeoVictoria":
     st.sidebar.markdown("""
     <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
         <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-        <small style="color: #475569;">1. Carga el archivo <b>6. BBDD Historia laboral de empleados</b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
+        <small style="color: #475569;">1. Carga el archivo <b></b>.<br>2. Selecciona el Centro de Costos.<br>3. Ajusta las fechas y ejecuta la auditoría.</small>
     </div>
     """, unsafe_allow_html=True)
 
