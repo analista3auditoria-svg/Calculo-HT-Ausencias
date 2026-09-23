@@ -1384,7 +1384,7 @@ elif modulo_seleccionado == "2. Análisis Auditoría TS":
     if "kpi_revisar_m2" not in st.session_state:
         st.session_state.kpi_revisar_m2 = 0
 
-    st.header("📁 1. Carga de Archivos Base")
+    st.header("📁 1. Bases de datos")
 
     col_file1, col_file2, col_file3 = st.columns(3)
     with col_file1:
