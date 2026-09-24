@@ -145,41 +145,40 @@ st.markdown("""
         .kpi-value-info { color: #00529B; }
         .kpi-value-success { color: #16a34a; }
 
-        /* Estilizado del Slider del Sidebar */
+        /* Estilizado del Slider de Fechas estilo PowerBI / Custom */
         div[data-baseweb="slider"] {
-            margin-top: 8px;
-            margin-bottom: 8px;
+            margin-top: 14px;
+            margin-bottom: 14px;
         }
         div[data-baseweb="slider"] > div {
             background-color: #cbd5e1 !important;
         }
         div[role="slider"] {
-            background-color: #00529B !important;
+            background-color: #3b82f6 !important;
             border: 2px solid #ffffff !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
-            width: 18px !important;
-            height: 18px !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25) !important;
+            width: 22px !important;
+            height: 22px !important;
         }
 
-        /* Botones pequeños de ajuste fino +/- */
-        [data-testid="stSidebar"] div.stButton > button {
-            background: #ffffff !important;
-            color: #0f172a !important;
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 6px !important;
-            padding: 2px 6px !important;
-            font-size: 12px !important;
-            font-weight: 700 !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-            min-height: 32px !important;
-        }
-        [data-testid="stSidebar"] div.stButton > button:hover {
-            background: #f1f5f9 !important;
-            border-color: #00529B !important;
+        /* Botones Grandes Más y Menos para el Slicer */
+        .btn-plus-minus button {
+            background-color: #ffffff !important;
+            border: 2px solid #00529B !important;
             color: #00529B !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+            border-radius: 12px !important;
+            height: 48px !important;
+            line-height: 1 !important;
+            box-shadow: 0 2px 5px rgba(0,82,155,0.15) !important;
+        }
+        .btn-plus-minus button:hover {
+            background-color: #00529B !important;
+            color: #ffffff !important;
         }
 
-        /* Botón Ejecutar Auditoría */
+        /* Botón Principal Ejecutar */
         .main div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
@@ -1586,58 +1585,54 @@ fecha_ini_sup = st.sidebar.date_input("Fecha Inicial Auditoría", value=datetime
 fecha_fin_sup = st.sidebar.date_input("Fecha Final Auditoría", value=datetime.date(2026, 9, 10))
 
 
-# ── BARRAS DE RANGO Y BOTONES (+) / (-) INTEGRADOS EN UN SOLO PANEL COMPACTO ──
+# ── CONTROLES UNIFICADOS (BOTONES GRANDES ➖ / ➕ Y BARRA SLICER) ────────────
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ☁️ Filtro Rango de Fechas API Novasoft")
 
-# Estado inicial seguro
+# Estado inicial en Session State
 if "nova_fecha_ini" not in st.session_state:
     st.session_state.nova_fecha_ini = datetime.date(2026, 9, 1)
 if "nova_fecha_fin" not in st.session_state:
     st.session_state.nova_fecha_fin = datetime.date(2026, 9, 15)
 
-def modificar_dias_ini(dias):
-    st.session_state.nova_fecha_ini += datetime.timedelta(days=dias)
+# Funciones de alteración directa de días
+def restar_dias_rango():
+    st.session_state.nova_fecha_ini -= datetime.timedelta(days=1)
+    st.session_state.nova_fecha_fin -= datetime.timedelta(days=1)
 
-def modificar_dias_fin(dias):
-    st.session_state.nova_fecha_fin += datetime.timedelta(days=dias)
+def sumar_dias_rango():
+    st.session_state.nova_fecha_ini += datetime.timedelta(days=1)
+    st.session_state.nova_fecha_fin += datetime.timedelta(days=1)
 
+# Botones destacados de Más y Menos arriba
+col_b1, col_b2 = st.sidebar.columns(2)
+with col_b1:
+    st.markdown('<div class="btn-plus-minus">', unsafe_allow_html=True)
+    st.button("➖  Restar Día", key="btn_minus_single", on_click=restar_dias_rango)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_b2:
+    st.markdown('<div class="btn-plus-minus">', unsafe_allow_html=True)
+    st.button("➕  Sumar Día", key="btn_plus_single", on_click=sumar_dias_rango)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Slicer / Barra Deslizante Unificada
 min_date_limit = datetime.date(2025, 1, 1)
 max_date_limit = datetime.date(2027, 12, 31)
 
-# Control 1: Rango en Barra Slider
 slider_rango_nov = st.sidebar.slider(
-    "Ajustar Rango con Barra Deslizante:",
+    "Rango Seleccionado:",
     min_value=min_date_limit,
     max_value=max_date_limit,
     value=(st.session_state.nova_fecha_ini, st.session_state.nova_fecha_fin),
-    format="YYYY/MM/DD"
+    format="YYYY/MM/DD",
+    label_visibility="visible"
 )
+
 st.session_state.nova_fecha_ini = slider_rango_nov[0]
 st.session_state.nova_fecha_fin = slider_rango_nov[1]
 
-# Control 2: Botones de Ajuste Fino +/-
-st.sidebar.markdown("**Ajuste Fino por Días (➕ / ➖):**")
-
-col_ini_label, col_fin_label = st.sidebar.columns(2)
-with col_ini_label:
-    st.caption("Ajustar Inicio")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.button("➖ 1d", key="btn_ini_m1", on_click=modificar_dias_ini, args=(-1,))
-    with c2:
-        st.button("➕ 1d", key="btn_ini_p1", on_click=modificar_dias_ini, args=(1,))
-
-with col_fin_label:
-    st.caption("Ajustar Fin")
-    c3, c4 = st.columns(2)
-    with c3:
-        st.button("➖ 1d", key="btn_fin_m1", on_click=modificar_dias_fin, args=(-1,))
-    with c4:
-        st.button("➕ 1d", key="btn_fin_p1", on_click=modificar_dias_fin, args=(1,))
-
-# Muestra limpia y elegante del rango activo
 st.sidebar.caption(
     f"🗓️ **Rango Activo:** `{st.session_state.nova_fecha_ini.strftime('%Y-%m-%d')}` al `{st.session_state.nova_fecha_fin.strftime('%Y-%m-%d')}`"
 )
@@ -1646,7 +1641,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Ajusta el rango con la barra o los botones +/-.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
+    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Usa los botones ➕ / ➖ o la barra deslizante.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
 </div>
 """, unsafe_allow_html=True)
 
