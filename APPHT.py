@@ -145,22 +145,25 @@ st.markdown("""
         .kpi-value-info { color: #00529B; }
         .kpi-value-success { color: #16a34a; }
 
-        div[data-baseweb="slider"] {
-            margin-top: 10px;
-            margin-bottom: 10px;
+        /* Botones del Sidebar para sumar y restar días */
+        [data-testid="stSidebar"] div.stButton > button {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            padding: 4px 8px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
         }
-        div[data-baseweb="slider"] > div {
-            background-color: #e2e8f0 !important;
-        }
-        div[role="slider"] {
-            background-color: #00529B !important;
-            border: 3px solid #ffffff !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
-            width: 20px !important;
-            height: 20px !important;
+        [data-testid="stSidebar"] div.stButton > button:hover {
+            background: #e2e8f0 !important;
+            border-color: #00529B !important;
+            color: #00529B !important;
         }
 
-        div.stButton > button:first-child {
+        /* Botón de Ejecutar Auditoría */
+        .main div.stButton > button:first-child {
             background: linear-gradient(135deg, #00529B 0%, #003366 100%) !important;
             color: white !important;
             border-radius: 10px !important;
@@ -172,7 +175,7 @@ st.markdown("""
             transition: all 0.2s ease !important;
             width: 100%;
         }
-        div.stButton > button:first-child:hover {
+        .main div.stButton > button:first-child:hover {
             background: linear-gradient(135deg, #003366 0%, #002244 100%) !important;
             box-shadow: 0 6px 16px rgba(0, 82, 155, 0.35) !important;
             transform: translateY(-1px);
@@ -761,7 +764,7 @@ def procesar_plantilla_geovictoria(
     contrato_principal,
     fecha_ini_sup, fecha_fin_sup,
     file_nomina,
-    rango_fechas_nova_slider
+    f_ini_nova_date, f_fin_nova_date
 ):
     df_marc_raw = pd.read_excel(file_entrada, sheet_name=sheet_entrada)
     
@@ -1407,11 +1410,11 @@ def procesar_plantilla_geovictoria(
     wb.save(output)
     output.seek(0)
     
-    # ── SEGUNDA FASE: CONSUMIR API NOVASOFT APLICANDO EL RANGO DEL SLICER ──
+    # ── SEGUNDA FASE: CONSUMIR API NOVASOFT APLICANDO FECHAS AJUSTADAS POR LOS BOTONES ──
     excel_novasoft_api = None
     if not file_novasoft:
-        f_ini_str = rango_fechas_nova_slider[0].strftime("%Y-%m-%d")
-        f_fin_str = rango_fechas_nova_slider[1].strftime("%Y-%m-%d")
+        f_ini_str = f_ini_nova_date.strftime("%Y-%m-%d")
+        f_fin_str = f_fin_nova_date.strftime("%Y-%m-%d")
         excel_novasoft_api = consumir_y_generar_excel_novasoft(f_ini_str, f_fin_str)
 
     # ── TERCERA FASE: SI SE DISPONE DE PLANILLA DE NÓMINA (BBDD 8) PROCESAR HTCC ──
@@ -1518,7 +1521,6 @@ def procesar_plantilla_geovictoria(
 
 # ─── CARGA DE ARCHIVOS BBDD DE LA PLATAFORMA Y EXTRACCIÓN HISTORIA LABORAL ───
 
-# 1. Extracción e integración en memoria de la BBDD Historia Laboral (#6) vía API
 file_historial_api = consumir_y_generar_excel_historia_laboral()
 
 with st.expander("📁 Bases de datos", expanded=True):
@@ -1532,7 +1534,6 @@ with st.expander("📁 Bases de datos", expanded=True):
         file_maestro = st.file_uploader("5. BBDD Maestro de empleados (.xlsx)", type=["xlsx"], help="BD maestro del personal de la compañía")
         file_nomina = st.file_uploader("8. Nómina (.xlsx)", type=["xlsx"], help="Plantilla de Nómina para consolidación HTCC")
 
-# Poblado dinámico del selector de Centros de Costo desde la hoja 'data' generada por la API de Historia Laboral
 lista_cc = ["FUNDACION HOSPITAL DE LA MISERICORDIA"]
 
 if file_historial_api:
@@ -1556,7 +1557,6 @@ sql_server = st.sidebar.text_input("Servidor SQL", value="192.168.1.3")
 sql_user = st.sidebar.text_input("Usuario SQL", value="USR_AUDITORIA")
 sql_password = st.sidebar.text_input("Contraseña SQL", type="password")
 
-# Nombres de bases de datos predefinidos
 sql_database_ubicaciones = "BD_SUPERNUMERARIOS"
 sql_database_sic = "BD_SIC"
 
@@ -1568,28 +1568,77 @@ st.sidebar.markdown("### 📅 Filtro Rango de Fechas Auditoría General")
 fecha_ini_sup = st.sidebar.date_input("Fecha Inicial Auditoría", value=datetime.date(2026, 9, 1))
 fecha_fin_sup = st.sidebar.date_input("Fecha Final Auditoría", value=datetime.date(2026, 9, 10))
 
-# ── SLICER PROFESIONAL TIPO BARRA DESLIZANTE CON RANGO DE FECHAS ──
+
+# ── CONTROLES INTERACTIVOS CON BOTONES (+ / -) PARA API NOVASOFT ───────────
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ☁️ Filtro Rango de Fechas API Novasoft")
 
-min_date_limit = datetime.date(2025, 1, 1)
-max_date_limit = datetime.date(2027, 12, 31)
+# Inicialización segura en Session State
+if "nova_fecha_ini" not in st.session_state:
+    st.session_state.nova_fecha_ini = datetime.date(2026, 9, 1)
+if "nova_fecha_fin" not in st.session_state:
+    st.session_state.nova_fecha_fin = datetime.date(2026, 9, 15)
 
-rango_fechas_nova_slider = st.sidebar.slider(
-    "Selecciona Rango de Fechas (API Novasoft):",
-    min_value=min_date_limit,
-    max_value=max_date_limit,
-    value=(datetime.date(2026, 9, 1), datetime.date(2026, 9, 15)),
-    format="YYYY/MM/DD"
+# Funciones Callback para alterar días
+def modificar_dias_ini(dias):
+    st.session_state.nova_fecha_ini += datetime.timedelta(days=dias)
+
+def modificar_dias_fin(dias):
+    st.session_state.nova_fecha_fin += datetime.timedelta(days=dias)
+
+# Controles para Fecha Inicial Novasoft
+st.sidebar.markdown("**Fecha Inicial Novasoft API:**")
+nova_fecha_ini = st.sidebar.date_input(
+    "Seleccionar Fecha Inicial Nova", 
+    value=st.session_state.nova_fecha_ini,
+    key="input_date_ini",
+    label_visibility="collapsed"
 )
+st.session_state.nova_fecha_ini = nova_fecha_ini
 
-st.sidebar.caption(f"🗓️ **Rango Seleccionado:** `{rango_fechas_nova_slider[0].strftime('%Y-%m-%d')}` al `{rango_fechas_nova_slider[1].strftime('%Y-%m-%d')}`")
+col_i1, col_i2, col_i3, col_i4 = st.sidebar.columns(4)
+with col_i1:
+    st.button("➖ 7d", key="btn_ini_m7", on_click=modificar_dias_ini, args=(-7,))
+with col_i2:
+    st.button("➖ 1d", key="btn_ini_m1", on_click=modificar_dias_ini, args=(-1,))
+with col_i3:
+    st.button("➕ 1d", key="btn_ini_p1", on_click=modificar_dias_ini, args=(1,))
+with col_i4:
+    st.button("➕ 7d", key="btn_ini_p7", on_click=modificar_dias_ini, args=(7,))
+
+st.sidebar.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+# Controles para Fecha Final Novasoft
+st.sidebar.markdown("**Fecha Final Novasoft API:**")
+nova_fecha_fin = st.sidebar.date_input(
+    "Seleccionar Fecha Final Nova", 
+    value=st.session_state.nova_fecha_fin,
+    key="input_date_fin",
+    label_visibility="collapsed"
+)
+st.session_state.nova_fecha_fin = nova_fecha_fin
+
+col_f1, col_f2, col_f3, col_f4 = st.sidebar.columns(4)
+with col_f1:
+    st.button("➖ 7d", key="btn_fin_m7", on_click=modificar_dias_fin, args=(-7,))
+with col_f2:
+    st.button("➖ 1d", key="btn_fin_m1", on_click=modificar_dias_fin, args=(-1,))
+with col_f3:
+    st.button("➕ 1d", key="btn_fin_p1", on_click=modificar_dias_fin, args=(1,))
+with col_f4:
+    st.button("➕ 7d", key="btn_fin_p7", on_click=modificar_dias_fin, args=(7,))
+
+# Muestra dinámica del Rango Seleccionado
+st.sidebar.caption(
+    f"🗓️ **Rango Seleccionado:** `{st.session_state.nova_fecha_ini.strftime('%Y-%m-%d')}` al `{st.session_state.nova_fecha_fin.strftime('%Y-%m-%d')}`"
+)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 <div style="background-color: #f0f7ff; padding: 12px; border-radius: 8px; border-left: 4px solid #00529B;">
     <small style="color: #00529B; font-weight: 600;">💡 Instrucciones</small><br>
-    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Ajusta el Slicer de fechas para Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
+    <small style="color: #475569;">1. Ingresa la contraseña de SQL Server.<br>2. Usa los botones ➕ / ➖ para ajustar días en Novasoft.<br>3. Haz clic en Ejecutar Auditoría para procesar todo.</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1648,7 +1697,8 @@ if st.button("⚡ Ejecutar Auditoría TS y Procesar Marcaciones", type="primary"
                     contrato_principal=contrato_principal,
                     fecha_ini_sup=fecha_ini_sup, fecha_fin_sup=fecha_fin_sup,
                     file_nomina=file_nomina,
-                    rango_fechas_nova_slider=rango_fechas_nova_slider
+                    f_ini_nova_date=st.session_state.nova_fecha_ini,
+                    f_fin_nova_date=st.session_state.nova_fecha_fin
                 )
 
             st.session_state["procesado_exitoso"] = True
